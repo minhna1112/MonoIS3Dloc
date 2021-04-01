@@ -4,7 +4,6 @@ from tensorflow import keras
 
 def fully_connected(input_layer, units, activate=True, bn=True, activate_type='leaky', dropout=None):
     dense = keras.layers.Dense(units)(input_layer)
-    print(dense)
     if bn:
         dense = keras.layers.BatchNormalization()(dense)
     if activate:
@@ -16,7 +15,6 @@ def fully_connected(input_layer, units, activate=True, bn=True, activate_type='l
             dense = tf.nn.relu(dense)
     if dropout is not None:
         dense = keras.layers.Dropout(dropout)(dense)
-    print(dense)
     return dense
 
 
