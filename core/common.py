@@ -3,6 +3,7 @@ from tensorflow import keras
 
 
 def fully_connected(input_layer, units, activate=True, bn=True, activate_type='leaky', dropout=None):
+    # A Densely connected layer : Dense -> BatchNorm -> Activation
     dense = keras.layers.Dense(units)(input_layer)
     if bn:
         dense = keras.layers.BatchNormalization()(dense)
@@ -19,12 +20,12 @@ def fully_connected(input_layer, units, activate=True, bn=True, activate_type='l
 
 
 def convolutional(input_layer, filters_shape, downsample=False, activate=True, bn=True, activate_type='leaky',
-                  dropout=None, flatten=False):
+                  dropout=None):
+    #A Convolutional layer : Conv2D -> BatchNorm -> Activation
     strides = 1
     if downsample:
         padding = 'valid'
-        if not flatten:
-            strides = 2
+        strides = 2
             #input_layer = keras.layers.ZeroPadding2D(((1, 0), (1, 0)))(input_layer)
     else:
         padding = 'same'
@@ -56,21 +57,43 @@ def mish(x):
 
 
 def residual_block(input_layer, input_channel, filter_num1, filter_num2, activate_type='leaky', dropout=0.1):
+    assert input_channel == filter_num2
+    # Input shape: H x W X input_channel
+    # Output shape: H x W X input_channel
+
     short_cut = input_layer
     conv = convolutional(input_layer, filters_shape=(1, 1, input_channel, filter_num1), activate_type=activate_type,
                          dropout=dropout)
     conv = convolutional(conv, filters_shape=(3, 3, filter_num1, filter_num2), activate_type=activate_type,
                          dropout=dropout)
-
+    #The output from 2 convolutional layers is added to the original input (residual connection)
     residual_output = short_cut + conv
     return residual_output
 
 
-def fully_conv_block(input_layer, input_channel, filter_num1, activate_type='leaky', dropout=0.5):
-    conv = convolutional(input_layer,
-                         filters_shape=(input_layer.shape[1], input_layer.shape[2], input_channel, input_channel//2),
-                         activate_type=activate_type, downsample=True, flatten=True, dropout=dropout)
-    conv = convolutional(conv, filters_shape=(1, 1, input_channel//2, filter_num1), activate_type=activate_type,
-                         flatten=True, dropout=dropout)
+def dense_block(input_layer, input_channel, growth_rate, activation_type='leaky', dropout=0.5):
+    # Input shape: H x W X input_channel
+    # Output shape: H x W X (input_channel + growth_rate)
+   conv = residual_block(input_layer, input_channel, input_channel//2, input_channel, activation_type, dropout)
+   conv = convolutional(conv, filters_shape=(1,1,input_channel, growth_rate), activate_type=activation_type, dropout=dropout)
+   conv  = tf.concat([input_layer, conv], axis=-1)
+
+   return conv
+
+
+def csp_block(input_layer, input_channel, growth_rate, num_dense_blocks=2,activation_type='leaky', dropout=0.5):
+    #split input feature maps into 2 halves (channel-wise):
+    #One half is passed through multiple dense blocks
+    #The other half is then concatenated with the output of the the dense blocks
+    #shortcut, conv = tf.split(input_layer, num_or_size_splits=2, axis=-1) (REMOVED)
+
+    #Input shape: H x W X input_channel
+    #Output shape: H x W X (input_channel + num_dense_blocks*growth_rate)
+    conv = input_layer
+    for i in range(num_dense_blocks):
+        num_fm = conv.shape[-1]
+        conv = dense_block(conv, num_fm, growth_rate, activation_type, dropout)
+    #conv = tf.concat([shortcut, conv], axis=-1) (REMOVED)
+
     return conv
 

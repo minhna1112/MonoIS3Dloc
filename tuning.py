@@ -5,7 +5,6 @@ from tensorflow import keras
 
 def create_tuning_net(hparams):
     net = PPNet.create_net(
-        num_fc_blocks= hparams[HP_NUM_FC_BLOCKS],
         num_res_blocks= hparams[HP_NUM_RES_BLOCKS],
         fc_activation= hparams[HP_ACTIVATION],
         conv_activation=hparams[HP_ACTIVATION],
@@ -15,12 +14,23 @@ def create_tuning_net(hparams):
     )
     net.compile(
         optimizer='adam',
-        loss='mse',
+        loss='mse'
     )
 
     return net
 
-def run_tuning_session
+def run_training(net, data_train, batch_size, epochs):
+    net.fit(data_train)
+    return net.eval()
+
+def run_single_tuning_session(run_dir, hparams):
+    with tf.summary.create_file_writer(run_dir).as_default():
+        hp.hparams(hparams)  # record the values used in this trial
+        net = create_tuning_net(hparams)
+        mse = run_training()
+
+        tf.summary.scalar('mse', mse, step=1)
+
 
 if __name__ == '__main__':
     HP_NUM_FC_BLOCKS = hp.HParam('num_fc_blocks', hp.Discrete([2, 5]))
@@ -43,6 +53,7 @@ if __name__ == '__main__':
             metrics=[hp.Metric(tf.keras.metrics.MeanSquaredError(), display_name='MSE_LOSS')],
 
         )
+
 
 
 
