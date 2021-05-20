@@ -1,3 +1,5 @@
+import math
+
 from core import common
 import tensorflow as tf
 from tensorflow import keras
@@ -35,41 +37,31 @@ def create_net(image_shape=(416,416,3), num_csp_blocks=4, num_dense_blocks=2, gr
                        init_num_fms=init_num_fms, final_num_fms=final_num_fms)
 
     model = keras.Model(inputs=input_tensor, outputs=net_output, name='PPNet')
-    model.summary()
 
     return model
 
-def create_simple_net(image_shape=(224,224,1), num_conv=6, init_num_fm=32, conv_dropout=0.25, fc_dropout=0.5):
+def create_simple_net(image_shape=(224,224,1),  num_conv=6, init_num_fm=32, use_preprocess_layer=True,
+                      conv_dropout=0.25, turn_off_later_bn=True, turn_off_conv_dropout=True,fc_dropout=0.5,
+                      conv_activation='leaky', fc_activation='relu'):
     input_tensor = keras.layers.Input(shape=image_shape, name='input_image')
-    # conv = input_tensor
-    conv = keras.layers.experimental.preprocessing.Rescaling(scale=1./127.5, offset=-1)(input_tensor)
+    input_tensor = keras.layers.experimental.preprocessing.Rescaling(scale=1./127.5, offset=-1)(input_tensor)
 
-    conv = common.convolutional(conv, filters_shape=(3,3,1,init_num_fm), dropout=conv_dropout)
+
+    conv = common.convolutional(input_tensor, filters_shape=(3,3,1,init_num_fm), dropout=not turn_off_conv_dropout, activate_type=conv_activation)
     conv = tf.keras.layers.MaxPool2D()(conv)
 
-    conv = common.convolutional(conv, filters_shape=(3,3,init_num_fm,2*init_num_fm), dropout=conv_dropout)
-    conv = tf.keras.layers.MaxPool2D()(conv)
+    for i in range(num_conv-1):
+        conv = common.convolutional(conv, filters_shape=(3, 3, math.pow(2, i)*init_num_fm, math.pow(2, (i+1))*init_num_fm), dropout=not turn_off_conv_dropout, bn = not turn_off_later_bn, activate_type=conv_activation)
+        conv = tf.keras.layers.MaxPool2D()(conv)
 
-    conv = common.convolutional(conv, filters_shape=(3,3,2*init_num_fm,4*init_num_fm), dropout=conv_dropout)
-    conv = tf.keras.layers.MaxPool2D()(conv)
-
-    conv = common.convolutional(conv, filters_shape=(3,3,4*init_num_fm,8*init_num_fm), dropout=conv_dropout)
-    conv = tf.keras.layers.MaxPool2D()(conv)
-
-    conv = common.convolutional(conv, filters_shape=(3,3,8*init_num_fm,16*init_num_fm), dropout=conv_dropout)
-    conv = tf.keras.layers.MaxPool2D()(conv)
-
-    conv = common.convolutional(conv, filters_shape=(3,3,16*init_num_fm,32*init_num_fm), dropout=conv_dropout)
-    conv = tf.keras.layers.MaxPool2D()(conv)
 
     net_output = tf.keras.layers.Flatten()(conv)
-    net_output = common.fully_connected(net_output, units=256 ,dropout=fc_dropout)
-    net_output = common.fully_connected(net_output, units=16 ,dropout=fc_dropout)
+    net_output = common.fully_connected(net_output, units=256 ,dropout=fc_dropout, activate_type=fc_activation)
+    net_output = common.fully_connected(net_output, units=16, dropout=fc_dropout, activate_type=fc_activation)
     net_output = common.fully_connected(net_output, units=3, activate=False)
 
 
     model = keras.Model(inputs=input_tensor, outputs=net_output, name='SIMPNet')
-    model.summary()
 
     return model
 
@@ -89,15 +81,6 @@ class AbsoluteRMSE(keras.losses.Loss):
         mse = tf.reduce_mean(tf.square(y_pred - y_true), axis=-1)  # Shape (1,)
         return tf.math.sqrt(mse)  # shape (1,)
 
-'''class UpscaledAbsoluteRMSE(keras.losses.Loss):
-    def call(self, y_true, y_pred):
-        y_pred = tf.convert_to_tensor(y_pred)
-        #y_pred =
-        y_true = tf.cast(y_true, y_pred.dtype)
-        #distance = tf.reduce_sum(tf.square(y_true), axis=-1)  # Shape ()
-        mse = tf.reduce_mean(tf.square(y_pred - y_true), axis=-1)  # Shape (1,)
-        return tf.math.sqrt(mse)  # shape (1,)
-'''
 class DownScaledCustomRMSE(keras.losses.Loss):
     def call(self, y_true, y_pred):
         y_pred = tf.convert_to_tensor(y_pred)
@@ -130,10 +113,3 @@ class UpScaledAbsoluteRMSE(keras.losses.Loss):
         mse = tf.reduce_mean(tf.square(y_pred - y_true), axis=-1)  # Shape (1,)
         return tf.math.sqrt(mse)  # shape (1,)
 
-def custom_loss(ground_truth, pred):
-    #truth: 1,3
-    #pred: 1,3
-    distance = tf.reduce_sum(tf.square(ground_truth), axis=-1) #Shape ()
-    mse = tf.reduce_mean(tf.square(pred-ground_truth), axis=-1) #Shape (1,)
-
-    return tf.math.sqrt(tf.divide(mse, distance)) #shape (1,)
