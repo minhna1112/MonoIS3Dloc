@@ -44,10 +44,11 @@ def create_simple_net(image_shape=(224,224,1),  num_conv=6, init_num_fm=32, use_
                       conv_dropout=0.25, turn_off_later_bn=True, turn_off_conv_dropout=True,fc_dropout=0.5,
                       conv_activation='leaky', fc_activation='relu'):
     input_tensor = keras.layers.Input(shape=image_shape, name='input_image')
-    input_tensor = keras.layers.experimental.preprocessing.Rescaling(scale=1./127.5, offset=-1)(input_tensor)
+    conv = input_tensor
+    if use_preprocess_layer:
+        conv = keras.layers.experimental.preprocessing.Rescaling(scale=1./127.5, offset=-1)(conv)
 
-
-    conv = common.convolutional(input_tensor, filters_shape=(3,3,1,init_num_fm), dropout=not turn_off_conv_dropout, activate_type=conv_activation)
+    conv = common.convolutional(conv, filters_shape=(3,3,1,init_num_fm), dropout=not turn_off_conv_dropout, activate_type=conv_activation)
     conv = tf.keras.layers.MaxPool2D()(conv)
 
     for i in range(num_conv-1):
