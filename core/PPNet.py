@@ -1,3 +1,5 @@
+import math
+
 from core import common
 import tensorflow as tf
 from tensorflow import keras
@@ -35,6 +37,80 @@ def create_net(image_shape=(416,416,3), num_csp_blocks=4, num_dense_blocks=2, gr
                        init_num_fms=init_num_fms, final_num_fms=final_num_fms)
 
     model = keras.Model(inputs=input_tensor, outputs=net_output, name='PPNet')
-    model.summary()
 
     return model
+
+def create_simple_net(image_shape=(224,224,1),  num_conv=6, init_num_fm=32, use_preprocess_layer=True,
+                      conv_dropout=0.25, turn_off_later_bn=True, turn_off_conv_dropout=True,fc_dropout=0.5,
+                      conv_activation='leaky', fc_activation='relu'):
+    input_tensor = keras.layers.Input(shape=image_shape, name='input_image')
+    conv = input_tensor
+    if use_preprocess_layer:
+        conv = keras.layers.experimental.preprocessing.Rescaling(scale=1./127.5, offset=-1)(conv)
+
+    conv = common.convolutional(conv, filters_shape=(3,3,1,init_num_fm), dropout=not turn_off_conv_dropout, activate_type=conv_activation)
+    conv = tf.keras.layers.MaxPool2D()(conv)
+
+    for i in range(num_conv-1):
+        conv = common.convolutional(conv, filters_shape=(3, 3, math.pow(2, i)*init_num_fm, math.pow(2, (i+1))*init_num_fm), dropout=not turn_off_conv_dropout, bn = not turn_off_later_bn, activate_type=conv_activation)
+        conv = tf.keras.layers.MaxPool2D()(conv)
+
+
+    net_output = tf.keras.layers.Flatten()(conv)
+    net_output = common.fully_connected(net_output, units=256 ,dropout=fc_dropout, activate_type=fc_activation)
+    net_output = common.fully_connected(net_output, units=16, dropout=fc_dropout, activate_type=fc_activation)
+    net_output = common.fully_connected(net_output, units=3, activate=False)
+
+
+    model = keras.Model(inputs=input_tensor, outputs=net_output, name='SIMPNet')
+
+    return model
+
+class CustomRMSE(keras.losses.Loss):
+    def call(self, y_true, y_pred):
+        y_pred = tf.convert_to_tensor(y_pred)
+        y_true = tf.cast(y_true, y_pred.dtype)
+        distance = tf.reduce_sum(tf.square(y_true), axis=-1)  # Shape ()
+        mse = tf.reduce_mean(tf.square(y_pred - y_true), axis=-1)  # Shape (1,)
+        return tf.math.sqrt(tf.divide(mse, distance))  # shape (1,)
+
+class AbsoluteRMSE(keras.losses.Loss):
+    def call(self, y_true, y_pred):
+        y_pred = tf.convert_to_tensor(y_pred)
+        y_true = tf.cast(y_true, y_pred.dtype)
+        #distance = tf.reduce_sum(tf.square(y_true), axis=-1)  # Shape ()
+        mse = tf.reduce_mean(tf.square(y_pred - y_true), axis=-1)  # Shape (1,)
+        return tf.math.sqrt(mse)  # shape (1,)
+
+class DownScaledCustomRMSE(keras.losses.Loss):
+    def call(self, y_true, y_pred):
+        y_pred = tf.convert_to_tensor(y_pred)
+        y_true = tf.cast(y_true, y_pred.dtype)
+        y_true = tf.divide(y_true, 100)
+        distance = tf.reduce_sum(tf.square(y_true), axis=-1)  # Shape ()
+        mse = tf.reduce_mean(tf.square(y_pred - y_true), axis=-1)  # Shape (1,)
+        return tf.math.sqrt(tf.divide(mse, distance))  # shape (1,)
+
+class UpScaledCustomRMSE(keras.losses.Loss):
+
+    def call(self, y_true, y_pred):
+        y_pred = tf.convert_to_tensor(y_pred)
+        y_true = tf.cast(y_true, y_pred.dtype)
+        #y_true = tf.divide(y_true, 100.)
+        y_pred = tf.multiply(y_pred, 100.)
+        y_true = tf.multiply(y_true, 100.)
+        distance = tf.reduce_sum(tf.square(y_true), axis=-1)  # Shape ()
+        mse = tf.reduce_mean(tf.square(y_pred - y_true), axis=-1)  # Shape (1,)
+        return tf.math.sqrt(tf.divide(mse, distance))  # shape (1,)
+
+class UpScaledAbsoluteRMSE(keras.losses.Loss):
+
+    def call(self, y_true, y_pred):
+        y_pred = tf.convert_to_tensor(y_pred)
+        y_true = tf.cast(y_true, y_pred.dtype)
+        #y_true = tf.divide(y_true, 100.)
+        y_pred = tf.multiply(y_pred, 100.)
+        #distance = tf.reduce_sum(tf.square(y_true), axis=-1)  # Shape ()
+        mse = tf.reduce_mean(tf.square(y_pred - y_true), axis=-1)  # Shape (1,)
+        return tf.math.sqrt(mse)  # shape (1,)
+

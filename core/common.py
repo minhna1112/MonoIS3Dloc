@@ -20,7 +20,7 @@ def fully_connected(input_layer, units, activate=True, bn=True, activate_type='l
 
 
 def convolutional(input_layer, filters_shape, downsample=False, activate=True, bn=True, activate_type='leaky',
-                  dropout=None):
+                  dropout=True, dropout_rate=0.5):
     #A Convolutional layer : Conv2D -> BatchNorm -> Activation
     strides = 1
     if downsample:
@@ -47,8 +47,8 @@ def convolutional(input_layer, filters_shape, downsample=False, activate=True, b
         elif activate_type == "relu":
             conv = tf.nn.relu(conv)
 
-    if dropout is not None:
-        conv = keras.layers.Dropout(dropout)(conv)
+    if dropout:
+        conv =keras.layers.Dropout(dropout_rate)(conv)
     return conv
 
 
