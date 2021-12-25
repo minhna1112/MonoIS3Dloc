@@ -1,9 +1,11 @@
 import numpy as np
-#import pandas as pd
+import pandas as pd
 import cudf
 import os
 import torch
 from path import Path
+import cv2
+import torchvision
 
 def plot_3d():
     fig = plt.figure(figsize=(10, 10))
@@ -28,16 +30,25 @@ def plot_3d():
     plt.show()
 
 
-class DataLoader():
-    def __init__(self, path_to_dataset, split='train'):
-        self.df = cudf.read_csv(path_to_dataset)
-        #self.df = pd.read_csv(path_to_dataset)
+class AirsimData:
+    def __init__(self, path_to_dataset, split='train', use_cudf=True):
+        self.df = pd.read_csv(path_to_dataset)
+        if use_cudf:
+            self.df = cudf.from_pandas(self.df)
+        
 
     def __length__(self):
         return len(self.df)
 
     def __getitem__(self, index):
-
+        row = self.data.iloc[index]
+        #image = cv2.imread(row['img'], 0) # read in gray scale mode
+        image = torchvision.io.read_image(path=row['img'], mode=torchvision.io.image.ImageReadMode.GRAY) 
+        label = row.loc[['x','y', 'z']]
+        return image, label
+    
+class AirSimDataLoader(torchvision.data.utils.DataLoader):
+    
 
 if __name__ == '__main__':
     data_gen = tf.keras.preprocessing.image.ImageDataGenerator()
