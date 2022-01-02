@@ -42,5 +42,5 @@ STEP_SIZE_TRAIN = train_loader.n//train_loader.batch_size
 STEP_SIZE_VAL = val_loader.n//val_loader.batch_size
 
 next_batch = next(iter(val_loader))
-print(next_batch[0].shape) #
-print(next_batch[1].shape)
+print(next_batch[0].shape) # batch_size, h, w, 1
+print(next_batch[1].shape) # batch_size, 3
