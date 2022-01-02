@@ -7,7 +7,7 @@ class L2NormRMSE(tf.keras.losses.Loss):
         y_true = tf.cast(y_true, y_pred.dtype)
         #distance = tf.reduce_sum(tf.square(y_true), axis=-1)  # Shape ()
         mse = tf.reduce_sum(tf.square(y_pred - y_true), axis=-1)  # Shape (1,)
-        return tf.math.sqrt(mse)  # shape (1,)
+        return tf.cast(tf.math.sqrt(mse), dtype=tf.float32)  # shape (1,)
 
 class L2DepthLoss(tf.keras.losses.Loss):
     def call(self, y_true, y_pred):
@@ -17,7 +17,7 @@ class L2DepthLoss(tf.keras.losses.Loss):
         #y_pred = tf.expand_dims(y_pred, axis=-1)
         #y_true = tf.expand_dims(y_true, axis=-1)
         mse = tf.square(y_pred - y_true)  # Shape (1,)
-        return tf.math.sqrt(mse)  # shape (1,)
+        return tf.cast(tf.math.sqrt(mse), dtype=tf.float32)  # shape (1,)
 
 if __name__ == '__main__':
     x = tf.ones(shape=(4,3))
