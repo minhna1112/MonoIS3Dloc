@@ -36,7 +36,7 @@ val_loader = data_gen.flow_from_dataframe(
         target_size=(input_shape[1], input_shape[0]),
         color_mode="grayscale",
         class_mode="raw",
-        batch_size=1)
+        batch_size=32)
 
 STEP_SIZE_TRAIN = train_loader.n//train_loader.batch_size
 STEP_SIZE_VAL = val_loader.n//val_loader.batch_size
@@ -44,3 +44,5 @@ STEP_SIZE_VAL = val_loader.n//val_loader.batch_size
 next_batch = next(iter(val_loader))
 print(next_batch[0].shape) # batch_size, h, w, 1
 print(next_batch[1].shape) # batch_size, 3
+
+
