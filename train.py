@@ -1,6 +1,8 @@
 import tensorflow as tf
 from model.model import DepthAwareNet
 from model.loss import L2DepthLoss, L2NormRMSE
+
+from solver.optimizer import OptimizerFactory
 from solver.trainer import Trainer
 
 import pandas as pd
@@ -32,7 +34,7 @@ train_loader = data_gen.flow_from_dataframe(
       target_size=(input_shape[1], input_shape[0]),
       color_mode="grayscale",
       class_mode="raw",
-      batch_size=32)
+      batch_size=32, shuffle=True)
 
 val_loader = data_gen.flow_from_dataframe(
         dataframe=val_df,
@@ -53,9 +55,17 @@ net.build(input_shape=(None, 224, 398, 1))
 
 dist_loss_fn = L2NormRMSE()
 depth_loss_fn = L2DepthLoss()
-optimizer = tf.keras.optimizers.Adam()
 
-trainer = Trainer(train_loader, val_loader=val_loader, model=net, distance_loss_fn=dist_loss_fn, depth_loss_fn=depth_loss_fn, optimizer=optimizer, log_path='../ivsr_logs/log0401.txt', savepath='../ivsr_weights/training_0401_2')
-trainer.train(5, True)
-trainer.save_model()
+factory = OptimizerFactory(lr=1e-3, use_scheduler=True, staircase=True)
+optimizer = factory.get_optimizer()
+
+if __name__ == '__main__':
+
+    trainer = Trainer(train_loader, val_loader=val_loader,
+                      model=net, distance_loss_fn=dist_loss_fn, depth_loss_fn=depth_loss_fn,
+                      optimizer=optimizer,
+                      log_path='../ivsr_logs/log0601_20epochs.txt', savepath='../ivsr_weights/training_0601')
+
+    trainer.train(20, True)
+    trainer.save_model()
 

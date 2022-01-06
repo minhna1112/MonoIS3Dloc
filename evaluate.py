@@ -1,30 +1,26 @@
-import numpy as np
-import faulthandler; faulthandler.enable()
 import tensorflow as tf
-from core import PPNet
-from core import dataset
+import pandas as pd
 
-class RelativeError(tf.keras.metrics.Metric):
-    def __init__(self, name='relative_error', **kwargs):
-        super(RelativeError, self).__init__(name=name, **kwargs)
-        self.error = self.add_weight(name=name, initializer="zeros")
+from solver.evaluator import Evaluator
 
-    def update_state(self, y_true, y_pred, sample_weight=None):
-        loss_obj = PPNet.CustomRMSE()
-        self.error.assign(loss_obj(y_true, y_pred))
+input_shape = (398, 224, 1)
 
-    def result(self):
-        return self.error
+test_path = "/home/ivsr/CV_Group/phuc/airsim/test588_50.csv"
+test_df = pd.read_csv(test_path)
 
-def eval():
-    data_gen = tf.keras.preprocessing.image.ImageDataGenerator()
-    val_data = dataset.DataLoader('../IVSR_BINARY_DATA/50imperpose/data/', data_gen, split='val')
-    val_generator = val_data.batch_loader()
-    #model = tf.keras.models.load_model('./weights/baseline_2204_simp_zcentered')
-    model = tf.keras.models.load_model('./weights/training_1405_downscaled_mse_subset-1e-4', compile=False)
-    #model.compile(loss='mse', metrics=[UpscaledRelativeError()])
-    model.compile(loss='mse', metrics=[tf.keras.losses.MeanSquaredError(),RelativeError()])
-    model.evaluate(val_generator, batch_size=val_generator.batch_size)
+data_gen = tf.keras.preprocessing.image.ImageDataGenerator(rescale=1./255)
+test_loader = data_gen.flow_from_dataframe(
+        dataframe=test_df,
+        directory="/home/ivsr/CV_Group/phuc/airsim/50imperpose/full",
+        x_col="img",
+        y_col=["x", "y", "z"],
+        target_size=(input_shape[1], input_shape[0]),
+        color_mode="grayscale",
+        class_mode="raw",
+        batch_size=1)
 
-if __name__ == '__main__':
-    eval()
+net = tf.keras.models.load_model('../ivsr_weights/training_0401_4/cp-9.cpkt')
+
+evaluator  = Evaluator(test_loader, net, log_path='../ivsr_logs/test_training0401_4__cp-9.log')
+
+evaluator.evaluate_on_datafrane(test_df)

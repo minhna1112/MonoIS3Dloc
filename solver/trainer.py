@@ -6,7 +6,7 @@ import json
 import os
 
 class Trainer():
-    def __init__(self, dataloader, model: tf.keras.Model, distance_loss_fn: tf.keras.losses.Loss, depth_loss_fn: tf.keras.losses.Loss,optimizer, val_loader, log_path: str, savepath: str):
+    def __init__(self, dataloader, model: tf.keras.Model, distance_loss_fn: tf.keras.losses.Loss, depth_loss_fn: tf.keras.losses.Loss,optimizer: tf.keras.optimizers.Optimizer, val_loader, log_path: str, savepath: str):
         self.dataloader  = dataloader
         self.model = model
         self.distance_loss_fn = distance_loss_fn
@@ -56,9 +56,10 @@ class Trainer():
         return loss_values, distance_loss, depth_loss
 
 
+
     def train(self, epochs: int, save_checkpoint=True):
         for e in range(epochs):
-            print(f'Epoch: {e+1}: ...................')
+            print(f'Epoch: {e}: ........................................')
             running_train_loss = 0.0
             running_dist_loss = 0.0
             running_depth_loss = 0.0
@@ -73,7 +74,7 @@ class Trainer():
                     )
                 running_train_loss += loss*len(labels)
                 running_dist_loss  += dist_loss * len(labels)
-                running_depth_loss += loss * len(labels)
+                running_depth_loss += depth_loss * len(labels)
                 if batch_id >= len(self.dataloader):
                     break
 
@@ -105,7 +106,7 @@ class Trainer():
                     )
                 running_val_loss += loss * len(labels)
                 running_dist_loss += dist_loss * len(labels)
-                running_depth_loss += loss * len(labels)
+                running_depth_loss += depth_loss * len(labels)
 
 
                 if batch_id >= len(self.val_loader):
@@ -122,7 +123,7 @@ class Trainer():
 
             self.loss_dict['val_loss'].append(float(running_val_loss))
             self.loss_dict['val_dist_loss'].append(float(running_dist_loss))
-            self.loss_dict['val_depth_loss'].append(running_depth_loss)
+            self.loss_dict['val_depth_loss'].append(float(running_depth_loss))
 
             pd.DataFrame(self.loss_dict).to_csv(self.log_path)
 
