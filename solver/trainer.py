@@ -5,15 +5,19 @@ from path import Path
 import json
 import os
 
-class Trainer():
-    def __init__(self, dataloader, model: tf.keras.Model, distance_loss_fn: tf.keras.losses.Loss, depth_loss_fn: tf.keras.losses.Loss,optimizer: tf.keras.optimizers.Optimizer, val_loader, log_path: str, savepath: str):
+class Trainer:
+    def __init__(self, dataloader, model: tf.keras.Model,
+                 distance_loss_fn: tf.keras.losses.Loss, depth_loss_fn: tf.keras.losses.Loss,
+                 optimizer: tf.keras.optimizers.Optimizer, val_loader,
+                 log_path: str, savepath: str):
+
         self.dataloader  = dataloader
         self.model = model
         self.distance_loss_fn = distance_loss_fn
         self.depth_loss_fn = depth_loss_fn
         self.optimizer = optimizer
         self.batch_size = self.dataloader.batch_size
-        self.alpha = 0.1
+        self.alpha = 0.0
         self.val_loader = val_loader
 
         self.savepath = Path(savepath)
@@ -32,13 +36,21 @@ class Trainer():
                 depth_loss = self.depth_loss_fn(label_x,out_x)
             else:
                 depth_loss = 0.0
+
             out = tf.concat([out_x, out_y, out_z], axis=-1)
             distance_loss = self.distance_loss_fn(out, labels)
-            loss_values = self.alpha*depth_loss + distance_loss
+
+            depth_loss      = tf.cast(depth_loss, tf.float32)
+            distance_loss   = tf.cast(distance_loss, tf.float32)
+            alpha           = tf.cast(self.alpha, tf.float32)
+
+            loss_values     = alpha * depth_loss + distance_loss
+
         #Calculate backward gradients
         gradients = tape.gradient(loss_values, self.model.trainable_weights)
         #Update weights
         self.optimizer.apply_gradients(zip(gradients, self.model.trainable_weights))
+
         return loss_values, distance_loss, depth_loss
 
     def validate_on_batch(self, images,labels):
@@ -52,7 +64,13 @@ class Trainer():
             depth_loss = 0.0
         out = tf.concat([out_x, out_y, out_z], axis=-1)
         distance_loss = self.distance_loss_fn(out, labels)
-        loss_values = self.alpha * depth_loss + distance_loss
+
+        depth_loss      = tf.cast(depth_loss, tf.float32)
+        distance_loss   = tf.cast(distance_loss, tf.float32)
+        alpha           = tf.cast(self.alpha, tf.float32)
+
+        loss_values = alpha * depth_loss + distance_loss
+
         return loss_values, distance_loss, depth_loss
 
 
@@ -131,6 +149,7 @@ class Trainer():
                 print('Saving checkpoint....')
                 self.model.save(self.savepath/f'cp-{e}.cpkt')
                 print('Done')
+
     def save_model(self):
         self.model.save(self.savepath/'last_checkpoint')
         print('Saved last checkpoint at' + self.savepath)

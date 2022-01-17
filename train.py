@@ -1,71 +1,68 @@
 import tensorflow as tf
+
+from data.dataset import Dataset
+
 from model.model import DepthAwareNet
 from model.loss import L2DepthLoss, L2NormRMSE
 
 from solver.optimizer import OptimizerFactory
 from solver.trainer import Trainer
 
-import pandas as pd
+import argparse
 
-MAX_VALUE = 30.0
+tf.keras.backend.clear_session()
 
-input_shape = (398, 224, 1)
+parser = argparse.ArgumentParser(description='Select between small or big data',
+                                 formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-#train_path = "/home/ivsr/CV_Group/phuc/airsim/train.csv"
-train_path = "/home/ivsr/CV_Group/phuc/airsim/train588_50.csv"
-train_df = pd.read_csv(train_path)
-train_df["x"] = train_df["x"].div(MAX_VALUE)
-train_df["y"] = train_df["y"].div(MAX_VALUE)
-train_df["z"] = train_df["z"].div(MAX_VALUE)
-#val_path = "/home/ivsr/CV_Group/phuc/airsim/val.csv"
-val_path = "/home/ivsr/CV_Group/phuc/airsim/val588_50.csv"
-val_df = pd.read_csv(val_path)
-val_df["x"] = val_df["x"].div(MAX_VALUE)
-val_df["y"] = val_df["y"].div(MAX_VALUE)
-val_df["z"] = val_df["z"].div(MAX_VALUE)
+parser.add_argument('-d', '--data-size', type=str, choices=['big', 'small', 'real'], default='small')
 
-data_gen = tf.keras.preprocessing.image.ImageDataGenerator(rescale=1./255)
+args = parser.parse_args()
 
-train_loader = data_gen.flow_from_dataframe(
-      dataframe=train_df,
-      directory="/home/ivsr/CV_Group/phuc/airsim/50imperpose/full",
-      x_col="img",
-      y_col=["x", "y", "z"],
-      target_size=(input_shape[1], input_shape[0]),
-      color_mode="grayscale",
-      class_mode="raw",
-      batch_size=32, shuffle=True)
+input_shape = (224, 398)
 
-val_loader = data_gen.flow_from_dataframe(
-        dataframe=val_df,
-        directory="/home/ivsr/CV_Group/phuc/airsim/50imperpose/full",
-        x_col="img",
-        y_col=["x", "y", "z"],
-        target_size=(input_shape[1], input_shape[0]),
-        color_mode="grayscale",
-        class_mode="raw",
-        batch_size=32)
+################################
+#   Define data and dataloader #
+################################
+if args.data_size == 'big':
+    train_path = "/home/ivsr/CV_Group/phuc/airsim/train.csv"
+    val_path = "/home/ivsr/CV_Group/phuc/airsim/val.csv"
+    img_directory = "/home/ivsr/CV_Group/phuc/airsim/data"
+else:
+    train_path = "/home/ivsr/CV_Group/phuc/airsim/train588_50.csv"
+    val_path = "/home/ivsr/CV_Group/phuc/airsim/val588_50.csv"
+    img_directory = "/home/ivsr/CV_Group/phuc/airsim/50imperpose/full"
 
-STEP_SIZE_TRAIN = train_loader.n//train_loader.batch_size
-STEP_SIZE_VAL = val_loader.n//val_loader.batch_size
+dataset = Dataset(train_path, val_path, img_directory, input_shape)
+train_loader = dataset.generate_dataloader('train')
+val_loader = dataset.generate_dataloader('val')
 
+################
+# Define model #
+################
 net = DepthAwareNet()
-net.build(input_shape=(None, 224, 398, 1))
-#net.summary()
+net.build(input_shape=(None, input_shape[0], input_shape[1], 1))
 
-dist_loss_fn = L2NormRMSE()
-depth_loss_fn = L2DepthLoss()
+#######################
+# Define loss function#
+#######################
+dist_loss_fn = tf.keras.losses.MeanSquaredError()
+depth_loss_fn = tf.keras.losses.MeanSquaredError()
 
-factory = OptimizerFactory(lr=1e-3, use_scheduler=True, staircase=True)
+#######################
+# Define optimizer#
+#######################
+factory = OptimizerFactory(lr=1e-3, use_scheduler=False)
 optimizer = factory.get_optimizer()
 
 if __name__ == '__main__':
 
+    #trainer and train
     trainer = Trainer(train_loader, val_loader=val_loader,
                       model=net, distance_loss_fn=dist_loss_fn, depth_loss_fn=depth_loss_fn,
                       optimizer=optimizer,
-                      log_path='../ivsr_logs/log0601_20epochs.txt', savepath='../ivsr_weights/training_0601')
+                      log_path='../ivsr_logs/log0801_mse_noreg.txt', savepath='../ivsr_weights/training_0801_mse_no_reg')
 
-    trainer.train(20, True)
-    trainer.save_model()
+    #trainer.train(20, True)
+    #trainer.save_model()
 

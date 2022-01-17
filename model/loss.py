@@ -19,6 +19,9 @@ class L2DepthLoss(tf.keras.losses.Loss):
         mse = tf.square(y_pred - y_true)  # Shape (1,)
         return tf.cast(tf.math.sqrt(mse), dtype=tf.float32)  # shape (1,)
 
+
+
+
 if __name__ == '__main__':
     x = tf.ones(shape=(4,3))
     print(x[..., 0].shape)

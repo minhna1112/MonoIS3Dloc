@@ -66,12 +66,12 @@ class DepthAwareNet(tf.keras.Model):
         self.conv2 = downsample_convolution(64, name='conv2')
         self.conv3 = downsample_convolution(128, name='conv3')
         self.conv4 = downsample_convolution(256, name='conv4')
-        self.conv5 = downsample_convolution(256, name='conv5')
-        self.conv6 = downsample_convolution(256, name='conv6')
+        # self.conv5 = downsample_convolution(256, name='conv5')
+        # self.conv6 = downsample_convolution(256, name='conv6')
 
         self.flat = Flatten()
-        self.dense1 = Dense(512, activation=self.activation, name='dense1')
-        self.dense2 = Dense(64, activation=self.activation, name='dense2')
+        self.dense1 = Dense(128, activation=self.activation, name='dense1')
+        #self.dense2 = Dense(64, activation=self.activation, name='dense2')
         self.dense3 = Dense(3, name='dense3')
         self.sigmoid = tf.keras.layers.Activation('sigmoid')
         self.tanh = tf.keras.layers.Activation('tanh')
@@ -81,44 +81,20 @@ class DepthAwareNet(tf.keras.Model):
         out = self.conv2(out)
         out= self.conv3(out)
         out = self.conv4(out)
-        out = self.conv5(out)
-        #print(out.shape)
-        out = self.conv6(out)
+        # out = self.conv5(out)
+        # #print(out.shape)
+        # out = self.conv6(out)
         #print(out.shape)
         out = self.flat(out)
         #print(out.shape)
         out = self.dense1(out)
-        out = self.dense2(out)
+        # out = self.dense2(out)
         out = self.dense3(out)
         x, y, z = tf.split(value=out, num_or_size_splits=3, axis=-1)
         x = self.sigmoid(x)
         y = self.tanh(y)
         z = self.tanh(z)
         return x,y,z #[(batch_size, 1), (batch_size, 1), (batch_size, 1)]
-
-
-def simple_net(image_shape=(224, 398, 1)):
-    model = Sequential()
-
-    model.add(Conv2D(32, (3, 3), activation="relu", input_shape=image_shape))
-    model.add(MaxPooling2D(pool_size=(2, 2)))
-    model.add(Conv2D(64, (3, 3), activation="relu"))
-    model.add(MaxPooling2D(pool_size=(2, 2)))
-    model.add(Conv2D(128, (3, 3), activation="relu"))
-    model.add(MaxPooling2D(pool_size=(2, 2)))
-    model.add(Conv2D(256, (3, 3), activation="relu"))
-    model.add(MaxPooling2D(pool_size=(2, 2)))
-    model.add(Conv2D(256, (3, 3), activation="relu"))
-    model.add(MaxPooling2D(pool_size=(2, 2)))
-    model.add(Flatten())
-
-    model.add(Dense(512))
-    model.add(Dense(64))
-    model.add(Dense(3))
-    model.add(Activation("tanh"))
-
-    # plot_model(model, to_file="model.png")
-    return model
 
 if __name__ == '__main__':
     #model1 = simple_net()
@@ -138,6 +114,6 @@ if __name__ == '__main__':
     model3.build(input_shape=(None, 224, 398, 1))
     model3.summary()
 
-    x = tf.ones(shape=(4, 224, 398, 1))
+    #x = tf.ones(shape=(4, 224, 398, 1))
     # assert model2(x).shape == model1(x).shape
-    print(model3(x))  # [(Batch_size, 1), (Batch_size, 1),(Batch_size, 1)[
+    #print(model3(x))  # [(Batch_size, 1), (Batch_size, 1),(Batch_size, 1)[
