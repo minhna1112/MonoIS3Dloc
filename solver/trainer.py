@@ -150,6 +150,8 @@ class Trainer:
                 self.model.save(self.savepath/f'cp-{e}.cpkt')
                 print('Done')
 
+        return self.loss_dict['train_loss'][-1], self.loss_dict['val_loss'][-1]
+
     def save_model(self):
         self.model.save(self.savepath/'last_checkpoint')
         print('Saved last checkpoint at' + self.savepath)

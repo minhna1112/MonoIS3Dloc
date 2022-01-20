@@ -53,11 +53,9 @@ class DepthAwareNet(tf.keras.Model):
         super().__init__()
         self.activation  = activation
 
-        def downsample_convolution(out_channels=32, input_shape=None, name='conv'):
-            if input_shape is not None:
-                conv = Conv2D(out_channels, (3, 3), activation=self.activation, input_shape=input_shape)
-            else:
-                conv = Conv2D(out_channels, (3, 3), activation=self.activation)
+        def downsample_convolution(out_channels=32,  name='conv'):
+
+            conv = Conv2D(out_channels, (3, 3), activation=self.activation, padding='same')
             pool = MaxPooling2D(pool_size=(2, 2))
 
             return Sequential([conv, pool], name=name)
