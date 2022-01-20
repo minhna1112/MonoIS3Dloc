@@ -63,6 +63,6 @@ if __name__ == '__main__':
                       optimizer=optimizer,
                       log_path='../ivsr_logs/log0801_mse_noreg.txt', savepath='../ivsr_weights/training_0801_mse_no_reg')
 
-    #trainer.train(20, True)
+    #_  = trainer.train(20, True)
     #trainer.save_model()
 
