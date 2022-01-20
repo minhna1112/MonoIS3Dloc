@@ -25,13 +25,13 @@ input_shape = (224, 398)
 #   Define data and dataloader #
 ################################
 if args.data_size == 'big':
-    train_path = "/home/ivsr/CV_Group/phuc/airsim/train.csv"
-    val_path = "/home/ivsr/CV_Group/phuc/airsim/val.csv"
-    img_directory = "/home/ivsr/CV_Group/phuc/airsim/data"
+    train_path = "../data/train_big.csv"
+    val_path = "../data/val_big.csv"
+    img_directory = "../data/big/"
 else:
-    train_path = "/home/ivsr/CV_Group/phuc/airsim/train588_50.csv"
-    val_path = "/home/ivsr/CV_Group/phuc/airsim/val588_50.csv"
-    img_directory = "/home/ivsr/CV_Group/phuc/airsim/50imperpose/full"
+    train_path = "../data/train_small.csv"
+    val_path = "../data/val_small.csv"
+    img_directory = "../data/small/"
 
 dataset = Dataset(train_path, val_path, img_directory, input_shape)
 train_loader = dataset.generate_dataloader('train')
