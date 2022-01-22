@@ -1,8 +1,8 @@
+import time
+
 import tensorflow as tf
 import pandas as pd
-import time
 from tqdm import tqdm
-
 import argparse
 
 parser = argparse.ArgumentParser(description='Select between small or big data',
@@ -36,7 +36,7 @@ class Dataset:
         train_df["z"] = train_df["z"].div(self.MAX_VALUE)
         return train_df
 
-    def generate_dataloader(self, data_split='train'):
+    def generate_dataiterator(self, data_split='train'):
         if data_split=='train':
             df = self.train_df
         elif data_split=='val':
@@ -45,7 +45,7 @@ class Dataset:
             df = pd.read_csv(self.val_path)
 
 
-        data_loader = self.data_gen.flow_from_dataframe(
+        self.data_iterator = self.data_gen.flow_from_dataframe(
             dataframe=df,
             directory=self.image_dir,
             x_col="img",
@@ -53,10 +53,30 @@ class Dataset:
             target_size=self.input_shape,
             color_mode="grayscale",
             class_mode="raw",
-            batch_size=32, shuffle=True)
+            batch_size=1, shuffle=True)
 
-        return data_loader
+        # if parallel:
+        #     data_generator = DataFrameGenerator(data_loader)
+        #     tf_dataset = tf.data.Dataset.from_generator(data_generator.__iter__, output_types=(tf.float32, tf.float32))
+        #     tf_dataset = tf_dataset.map(lambda x, y : (x, y), num_parallel_calls=4)
+        #     return tf_dataset.it
 
+        return self.data_iterator
+
+class DataLoader:
+    def __init__(self, dataset: Dataset, split='train'):
+        self.dataset = dataset
+        self.dataset.generate_dataiterator(split)
+
+    def generator(self):
+        for (images, labels) in self.dataset.data_iterator:
+            yield images, labels
+
+    def make(self, batch_size: int):
+        tf_dataset = tf.data.Dataset.from_generator(self.generator, output_types=(tf.float32, tf.float32))
+        tf_dataset = tf_dataset.map(lambda x, y: (tf.squeeze(x, axis=0), tf.squeeze(y, axis=0)), num_parallel_calls=8)
+        tf_dataset = tf_dataset.batch(batch_size)
+        return tf_dataset
 
 
 if __name__ == '__main__':
@@ -75,16 +95,30 @@ if __name__ == '__main__':
 
 
     dataset = Dataset(train_path, val_path, img_directory, input_shape)
-    train_loader = dataset.generate_dataloader('train')
-    begin = time.time()
-    for batch_id, (images, labels) in enumerate(tqdm(train_loader, colour='#c22c4e')):
-        pass
-        #print(batch_id)
-    print(f'Process: {time.time()-begin} (s)')
+    train_loader = DataLoader(dataset, 'val')
+    batch_loader = train_loader.make(32)
 
+    begin = time.time()
+    for batch_id, (images, labels) in enumerate(tqdm(batch_loader, colour='#c22c4e')):
+        pass
+    print(f'Process: {time.time()-begin} (s)')
+    # train_loader = dataset.generate_dataloader('train')
     # val_loader = dataset.generate_dataloader('val')
+
+
+    # next_batch = next(val_loader)
+    # print(next_batch[0].shape) # batch_size, h, w, 1
+    # print(next_batch[1].shape) # batch_size, 3
     #
-    # next_batch = next(iter(val_loader))
+    # next_batch = next(val_loader)
     # print(next_batch[0].shape) # batch_size, h, w, 1
     # print(next_batch[1].shape) # batch_size, 3
 
+    # train_loader = DataLoader(dataset, 'val')
+    # tf_dataset = tf.data.Dataset.from_generator(train_loader.generator, output_types=(tf.float32, tf.float32))
+    # tf_dataset = tf_dataset.map(lambda x, y: (tf.squeeze(x, axis=0), tf.squeeze(y, axis=0)), num_parallel_calls=4)
+    # tf_dataset = tf_dataset.batch(320)
+    # for i, (X, y) in enumerate(tf_dataset):
+    #     print(X.shape)
+    #     print(i)
+    #print(next(iter(train_loader.generator())))  # batch_size, h, w, 1; batch_size, 3
