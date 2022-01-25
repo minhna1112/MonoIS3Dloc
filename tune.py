@@ -32,8 +32,7 @@ HP_USE_MSE = hp.HParam('use_mse', hp.Discrete([True, False]))
 
 with tf.summary.create_file_writer('/media/data/teamAI/minh/logs/hparam_tuning_2601/').as_default():
     _ = hp.hparams_config(hparams=[HP_STRIDES, HP_KSIZE, HP_NCONV, HP_USE_MSE],
-                          metrics=[hp.Metric('input_size', display_name='Input Size'),
-                                   hp.Metric('train_err', display_name='Train Distance Error (m)'),
+                          metrics=[hp.Metric('train_err', display_name='Train Distance Error (m)'),
                                    hp.Metric('val_err', display_name='Validation Distance Error (m)'),
                                    hp.Metric('num_params', display_name='# Params')])
 
@@ -104,7 +103,7 @@ def train_val_model(hparams, sess: int):
                       savepath='../ivsr_weights/tuning_2501',
                       use_mse=hparams[HP_USE_MSE])
 
-    train_loss, val_loss = trainer.train(13, False)
+    train_loss, val_loss = trainer.train(13, save_checkpoint=False, early_stop=True)
 
     return input_shape, train_loss, val_loss, net.count_params()
 
@@ -112,7 +111,7 @@ def run(run_dir, hparams, sess: int):
   with tf.summary.create_file_writer(run_dir).as_default():
     hp.hparams(hparams)  # record the values used in this trial
     input_shape, train_loss, val_loss, num_params = train_val_model(hparams, sess)
-    tf.summary.scalar('input_size', input_shape, step=1)
+    #tf.summary.text('input_size', f'{}input_shape, step=1)
     tf.summary.scalar('train_err', val_loss, step=1)
     tf.summary.scalar('val_err', train_loss, step=1)
     tf.summary.scalar('num_params', num_params, step=1)
