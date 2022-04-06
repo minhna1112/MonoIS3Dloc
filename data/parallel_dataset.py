@@ -6,13 +6,18 @@ from tqdm import tqdm
 from path import Path
 
 import argparse
+import os
+import warnings
 
-
+from keras_preprocessing.image import validate_filename
 
 parser = argparse.ArgumentParser(description='Select between small or big data',
                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
 parser.add_argument('-d', '--data-size', type=str, choices=['big', 'small', 'real'], default='small')
+
+
+
 
 class Dataset:
     def __init__(self, train_path: str,
@@ -25,6 +30,7 @@ class Dataset:
         self.train_path = train_path
         self.train_df = pd.read_csv(train_path)
         self.train_df = self.preprocess_label(self.train_df)
+        self.white_list_formats  = ('png', 'jpg', 'jpeg', 'bmp', 'ppm', 'tif', 'tiff')
 
     def preprocess_label(self, train_df: pd.DataFrame):
         train_df["x"] = train_df["x"].div(self.MAX_VALUE)
@@ -40,6 +46,33 @@ class Dataset:
         y = self.train_df[['x', 'y', 'z']].iloc[index]
         return X, y
 
+    
+    def _filter_valid_filepaths(self, x_col):
+        """Keep only dataframe rows with valid filenames
+
+        # Arguments
+            df: Pandas dataframe containing filenames in a column
+            x_col: string, column in `df` that contains the filenames or filepaths
+
+        # Returns
+            absolute paths to image files
+        """
+        filepaths = self.train_df [x_col].map(
+            lambda fname: os.path.join(self.image_dir, fname)
+        )
+        mask = filepaths.apply(validate_filename, args=(self.white_list_formats,))
+        n_invalid = (~mask).sum()
+        if n_invalid:
+            warnings.warn(
+                'Found {} invalid image filename(s) in x_col="{}". '
+                'These filename(s) will be ignored.'
+                .format(n_invalid, x_col)
+            )
+        self.train_df = self.train_df[mask]
+        
+        return self.train_df
+
+
 class DataLoader:
     def __init__(self, dataset: Dataset, input_shape, batch_size: int, shuffle=True, num_parallel_calls = 4):
         self.dataset = dataset
@@ -50,11 +83,14 @@ class DataLoader:
         self.shuffle = shuffle
         self.num_parallel_calls = num_parallel_calls
 
+        self.dataset._filter_valid_filepaths('img')
+
     def generator(self):
         indices = range(len(self.dataset))
         if self.shuffle:
             indices = random.sample(range(len(self.dataset)), len(indices))
         for i in indices:
+            # yield a tuple of image and corresponding positions labels
             yield self.dataset[i]
 
     def to_tensor(self, x, y):
@@ -62,7 +98,6 @@ class DataLoader:
         image = tf.io.decode_jpeg(image, channels=1)
         image = tf.image.resize(image, self.input_shape)
         image /= 255.0  # normalize to [0,1] range
-
         image = tf.convert_to_tensor(image, dtype=tf.float32)
         label =  tf.convert_to_tensor(y, dtype=tf.float32)
 
@@ -83,22 +118,26 @@ if __name__ == '__main__':
     input_shape = (224, 398)
 
     if args.data_size=='big':
-        train_path = "/home/ivsr/CV_Group/phuc/airsim/train.csv"
-        val_path = "/home/ivsr/CV_Group/phuc/airsim/val.csv"
+        train_path = "/home/ivsr/CV_Group/phuc/airsim/airsim/train.csv"
+        val_path = "/home/ivsr/CV_Group/phuc/airsim/airsim//val.csv"
         img_directory = "/home/ivsr/CV_Group/phuc/airsim/data"
     else:
-        train_path = "/home/ivsr/CV_Group/minh/train588_50.csv"
-        val_path = "/home/ivsr/CV_Group/minh/val588_50.csv"
-        img_directory = "/home/ivsr/CV_Group/minh/50imperpose/full"
+        train_path = "/media/data/teamAI/phuc/airsim/20_train.csv"
+        val_path = "/media/data/teamAI/phuc/airsim/20_val.csv"
+        img_directory = "/media/data/teamAI/phuc/airsim/20"
+
 
 
     dataset = Dataset(train_path, img_directory, input_shape)
+    
     sample = dataset[500]
-    print(sample)
-    train_loader = DataLoader(dataset, input_shape=input_shape)
+    # print(sample)
+    print(len(dataset.train_df))
+    train_loader = DataLoader(dataset, input_shape=input_shape, batch_size=32, num_parallel_calls=8)
+    print(len(dataset.train_df))
     s_tensor = train_loader.to_tensor(sample[0], sample[1])
-    print(s_tensor)
-    batch_loader = train_loader.make(32)
+    # print(s_tensor)
+    batch_loader = train_loader.make_batch()
     #print(len(train_loader))
     #
     begin = time.time()
