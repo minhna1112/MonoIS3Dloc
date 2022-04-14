@@ -54,7 +54,7 @@ class Evaluator:
             self.metric_dict['abs_x'].append(float(abs_out[..., 0]))
             self.metric_dict['abs_y'].append(float(abs_out[..., 1]))
             self.metric_dict['abs_z'].append(float(abs_out[..., 2]))
-            self.metric_dict['relative_dist_error'].append(pred_distance / 30.0)
+            self.metric_dict['relative_dist_error'].append(real_distance - pred_distance / 30.0)
             #print(self.metric_dict)
             self.export_to_csv()
 
