@@ -26,18 +26,18 @@ class Trainer:
 
         self.savepath = Path(savepath)
         self.log_path = log_path
-        self.loss_dict = {'train_loss': [], 'train_dist_loss': [], 'train_depth_loss': [],
-                          'val_loss': [], 'val_dist_loss': [], 'val_depth_loss': []}
+        self.loss_dict = {'train_loss': [], 'train_dist_loss': [], 'train_depth_loss': [], 'entropy_loss': [],
+                          'val_loss': [], 'val_dist_loss': [], 'val_depth_loss': [], 'val_entropy_loss': []}
         pd.DataFrame(self.loss_dict).to_csv(log_path)
         self.use_mse = use_mse
 
-        self.crossentropy_loss = ...
+        self.crossentropy_loss = tf.keras.losses.CategoricalCrossentropy()
 
     @tf.function
-    def train_on_batch(self, images,labels):
+    def train_on_batch(self, images,labels, derived_labels):
         with tf.GradientTape() as tape:
             #Perform forward pass 
-            out_x, out_y, out_z = self.model(images)
+            out_x, out_y, out_z, out_params = self.model(images)
             #Calculate loss
             if self.depth_loss_fn is not None:
                 label_x = tf.reshape(labels[..., 0], out_x.shape)
@@ -48,12 +48,14 @@ class Trainer:
 
             out = tf.concat([out_x, out_y, out_z], axis=-1)
             distance_loss = self.distance_loss_fn(out, labels)
+            entropy_loss = self.crossentropy_loss(out_params, derived_labels)
 
             depth_loss      = tf.cast(depth_loss, tf.float32)
             distance_loss   = tf.cast(distance_loss, tf.float32)
             alpha           = tf.cast(self.alpha, tf.float32)
+            entropy_loss    = tf.cast(entropy_loss, tf.float32)           
 
-            loss_values     = alpha * depth_loss + distance_loss
+            loss_values     = alpha * depth_loss + distance_loss + entropy_loss
 
         #Calculate backward gradients
         gradients = tape.gradient(loss_values, self.model.trainable_weights)
