@@ -44,7 +44,8 @@ class Dataset:
     def __getitem__(self, index):
         X = self.image_dir / self.train_df['img'].iat[index]
         y = self.train_df[['x', 'y', 'z']].iloc[index]
-        return X, y
+        derived_label = self.train_df['derived_label'].iat[index]
+        return X, y, derived_label
 
     
     def _filter_valid_filepaths(self, x_col):
@@ -60,6 +61,7 @@ class Dataset:
         filepaths = self.train_df [x_col].map(
             lambda fname: os.path.join(self.image_dir, fname)
         )
+        print("Validating filenames ... ... ...")
         mask = filepaths.apply(validate_filename, args=(self.white_list_formats,))
         n_invalid = (~mask).sum()
         if n_invalid:
@@ -83,7 +85,7 @@ class DataLoader:
         self.shuffle = shuffle
         self.num_parallel_calls = num_parallel_calls
 
-        self.dataset._filter_valid_filepaths('img')
+        # self.dataset._filter_valid_filepaths('img')
 
     def generator(self):
         indices = range(len(self.dataset))
@@ -93,15 +95,16 @@ class DataLoader:
             # yield a tuple of image and corresponding positions labels
             yield self.dataset[i]
 
-    def to_tensor(self, x, y):
+    def to_tensor(self, x, y, derived):
         image = tf.io.read_file(x)
         image = tf.io.decode_jpeg(image, channels=1)
         image = tf.image.resize(image, self.input_shape)
         image /= 255.0  # normalize to [0,1] range
         image = tf.convert_to_tensor(image, dtype=tf.float32)
         label =  tf.convert_to_tensor(y, dtype=tf.float32)
-
-        return image, label
+        derived = tf.one_hot(derived, depth=3)
+                
+        return image, label, derived
 
     def make_batch(self):
 
@@ -118,9 +121,9 @@ if __name__ == '__main__':
     input_shape = (224, 398)
 
     if args.data_size=='big':
-        train_path = "/home/ivsr/CV_Group/phuc/airsim/airsim/train.csv"
-        val_path = "/home/ivsr/CV_Group/phuc/airsim/airsim//val.csv"
-        img_directory = "/home/ivsr/CV_Group/phuc/airsim/data"
+        train_path = "./train_new.csv"
+        val_path = "./val_new.csv"
+        img_directory = "/media/data/teamAI/phuc/phuc/airsim/data"
     else:
         train_path = "/media/data/teamAI/phuc/airsim/20_train.csv"
         val_path = "/media/data/teamAI/phuc/airsim/20_val.csv"
@@ -128,22 +131,22 @@ if __name__ == '__main__':
 
 
 
-    dataset = Dataset(train_path, img_directory, input_shape)
+    dataset = Dataset(val_path, img_directory, input_shape)
     
     sample = dataset[500]
-    # print(sample)
-    print(len(dataset.train_df))
-    train_loader = DataLoader(dataset, input_shape=input_shape, batch_size=32, num_parallel_calls=8)
-    print(len(dataset.train_df))
-    s_tensor = train_loader.to_tensor(sample[0], sample[1])
-    # print(s_tensor)
-    batch_loader = train_loader.make_batch()
+    print(sample)
+    # print(len(dataset.train_df))
+    train_loader = DataLoader(dataset, input_shape=input_shape, batch_size=8, num_parallel_calls=8)
+    # print(len(dataset.train_df))
+    s_tensor = train_loader.to_tensor(sample[0], sample[1], sample[2])
+    print(s_tensor)
+    # batch_loader = train_loader.make_batch()
     #print(len(train_loader))
     #
-    begin = time.time()
-    for batch_id, (images, labels) in enumerate(tqdm(batch_loader, colour='#c22c4e')):
-        pass
-    print(f'Process: {time.time()-begin} (s)')
+    # begin = time.time()
+    # for batch_id, (images, labels) in enumerate(tqdm(batch_loader, colour='#c22c4e')):
+    #     pass
+    # print(f'Process: {time.time()-begin} (s)')
     # # train_loader = dataset.generate_dataloader('train')
     # val_loader = dataset.generate_dataloader('val')
 
