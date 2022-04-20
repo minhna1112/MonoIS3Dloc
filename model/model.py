@@ -4,6 +4,20 @@ from tensorflow.keras.layers import Conv2D, MaxPooling2D
 from tensorflow.keras.layers import Activation, Dropout, Flatten, Dense
 from tensorflow.keras.layers import LeakyReLU
 
+
+class PredictionHead(tf.keras.Model):
+    def __init__(self):
+        super().__init__()
+        self.sigmoid = tf.keras.layers.Activation('sigmoid')
+        self.tanh = tf.keras.layers.Activation('tanh')
+
+    def call(self, input_tensor):
+        x, y, z = tf.split(value=input_tensor, num_or_size_splits=3, axis=-1)
+        x = self.sigmoid(x)
+        y = self.tanh(y)
+        z = self.tanh(z)
+        return x, y, z
+
 class SimpleNet(tf.keras.Model):
     def __init__(self, image_shape, activation='relu',input_shape=(224,398,1)):
         super(SimpleNet, self).__init__()
@@ -48,6 +62,93 @@ class SimpleNet(tf.keras.Model):
         out = self.dense3(out)
         return out
 
+class BackBone(tf.keras.Model):
+    def __init__(self, activation='relu',input_shape=(224,398,1), num_ext_conv = 0, ksize=3):
+        super().__init__()
+        self.activation  = activation
+        self.num_ext_conv  = num_ext_conv
+        self.ksize = ksize
+
+        def downsample_convolution(out_channels=32,  name='conv'):
+
+            conv = Conv2D(out_channels, (self.ksize, self.ksize), activation=self.activation, padding='same')
+            pool = MaxPooling2D(pool_size=(2, 2))
+
+            return Sequential([conv, pool], name=name)
+
+        self.conv_base = Sequential([
+            downsample_convolution(32, name='conv1'),
+            downsample_convolution(64, name='conv2'),
+            downsample_convolution(128, name='conv3'),
+            downsample_convolution(256, name='conv4')
+        ], name='conv_base')
+
+        if self.num_ext_conv > 0 :
+            self.conv_ext = Sequential([
+                downsample_convolution(256, name=f'conv{4+i}') for i in range(self.num_ext_conv)
+            ], name='conv_ext')
+
+    
+    def call(self, inputs, training=None, mask=None):
+        out = self.conv_base(inputs)
+        if self.num_ext_conv > 0:
+            out = self.conv_ext(out)
+        return out
+
+class ParameterizedNet(tf.keras.Model):
+    def __init__(self, activation='relu',input_shape=(224,398,1), num_ext_conv = 0, ksize=3, num_params = 3):
+        super().__init__()
+        self.activation  = activation
+        self.num_ext_conv  = num_ext_conv
+        self.ksize = ksize
+        self.backbone1 = BackBone(activation, input_shape, num_ext_conv, ksize)
+        self.backbone2 = BackBone(activation, input_shape, num_ext_conv, ksize)
+        self.flatten1 = tf.keras.layers.Flatten()
+        self.flatten2 = tf.keras.layers.Flatten()
+        self.dense1 = Dense(128, activation=self.activation, name='dense1')
+        self.dense2 = Dense(128, activation=self.activation, name='dense2')
+        self.dense3 = Dense(3, activation=self.activation, name='dense3')
+        self.dense4 = Dense(3, activation=self.activation, name='dense4')
+        self.parameterized_layer = tf.keras.layers.Activation('softmax')
+        self.prediction_head = PredictionHead()
+
+    def call(self, inputs, training=None, mask=None):
+        out_1 = self.backbone1(inputs)
+        out_1 = self.flatten1(out_1)
+        out_1 = self.dense1(out_1)
+        out_1 = self.dense3(out_1)
+        out_1 = self.parameterized_layer(out_1)
+
+        out_2 = self.backbone2(inputs)
+        out_2 = self.flatten2(out_2)
+        out_2 = self.dense2(out_2)
+        out_2 = tf.concat([out_1, out_2], axis=-1)
+        out_2 = self.dense4(out_2)
+        
+        x, y, z = self.prediction_head(out_2)
+        
+        return x, y, z, out_1
+
+class BackboneSharedParameterizedNet(tf.keras.Model):
+    def __init__(self, activation='relu',input_shape=(224,398,1), num_ext_conv = 0, ksize=3, num_params = 3):
+        super().__init__()
+        self.activation  = activation
+        self.num_ext_conv  = num_ext_conv
+        self.ksize = ksize
+        self.backbone1 = BackBone(activation, input_shape, num_ext_conv, ksize)
+        self.flatten1 = tf.keras.layers.Flatten()
+        
+
+    def call(self, inputs, training=None, mask=None):
+
+        out = self.backbone1(inputs)
+        flattened = self.flatten1(out)
+
+
+        return out 
+    
+    
+
 class DepthAwareNet(tf.keras.Model):
     def __init__(self, activation='relu',input_shape=(224,398,1), num_ext_conv = 0, ksize=3):
         super().__init__()
@@ -89,37 +190,27 @@ class DepthAwareNet(tf.keras.Model):
             out = self.conv_ext(out)
 
         out = self.flat(out)
-        #print(out.shape)
         out = self.dense1(out)
-        # out = self.dense2(out)
         out = self.dense3(out)
-        x, y, z = tf.split(value=out, num_or_size_splits=3, axis=-1)
-        x = self.sigmoid(x)
-        y = self.tanh(y)
-        z = self.tanh(z)
+        # x, y, z = tf.split(value=out, num_or_size_splits=3, axis=-1)
+        # x = self.sigmoid(x)
+        # y = self.tanh(y)
+        # z = self.tanh(z)
+
+        x, y, z = prediction_head(out)
 
         return x,y,z #[(batch_size, 1), (batch_size, 1), (batch_size, 1)]
 
 
 if __name__ == '__main__':
-    #model1 = simple_net()
-    #model1.summary()
+    
+    # model3 = DepthAwareNet(num_ext_conv=0)
+    # model3.build(input_shape=(None, 224, 398, 1))
+    # model3.summary()
+    # print(f'Total params: {model3.count_params()}')
 
-    # model2 = SimpleNet(image_shape=(224,398,1))
-    # model2.build(input_shape=(None,224,398,1))
-    # model2.summary()
-    #
-    #
-    # x = tf.ones(shape=(4, 224,398, 1))
-    # #assert model2(x).shape == model1(x).shape
-    # print(model2(x).shape) #(Batch_size, 3)
-    #
 
-    model3 = DepthAwareNet(num_ext_conv=1)
-    model3.build(input_shape=(None, 224, 398, 1))
+    model3 = ParameterizedNet(num_ext_conv=0)
+    model3.build(input_shape=(None, 180, 320, 1))
     model3.summary()
     print(f'Total params: {model3.count_params()}')
-
-    #x = tf.ones(shape=(4, 224, 398, 1))
-    # assert model2(x).shape == model1(x).shape
-    #print(model3(x))  # [(Batch_size, 1), (Batch_size, 1),(Batch_size, 1)[
