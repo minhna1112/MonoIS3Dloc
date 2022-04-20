@@ -107,8 +107,8 @@ class ParameterizedNet(tf.keras.Model):
         self.flatten2 = tf.keras.layers.Flatten()
         self.dense1 = Dense(128, activation=self.activation, name='dense1')
         self.dense2 = Dense(128, activation=self.activation, name='dense2')
-        self.dense3 = Dense(3, activation=self.activation, name='dense3')
-        self.dense4 = Dense(3, activation=self.activation, name='dense4')
+        self.dense3 = Dense(3,  name='dense3')
+        self.dense4 = Dense(3,  name='dense4')
         self.parameterized_layer = tf.keras.layers.Activation('softmax')
         self.prediction_head = PredictionHead()
 
@@ -137,15 +137,32 @@ class BackboneSharedParameterizedNet(tf.keras.Model):
         self.ksize = ksize
         self.backbone1 = BackBone(activation, input_shape, num_ext_conv, ksize)
         self.flatten1 = tf.keras.layers.Flatten()
+
+        self.dense1 = Dense(128, activation=self.activation, name='dense1')
+        self.dense2 = Dense(128, activation=self.activation, name='dense2')
+        self.dense3 = Dense(3,  name='dense3')
+        self.dense4 = Dense(3,  name='dense4')
+        self.parameterized_layer = tf.keras.layers.Activation('softmax')
+        self.prediction_head = PredictionHead()
         
 
     def call(self, inputs, training=None, mask=None):
 
-        out = self.backbone1(inputs)
-        flattened = self.flatten1(out)
+        out_1 = self.backbone1(inputs)
+        flattened = self.flatten1(out_1)
 
+        out_1 = self.dense1(flattened)
+        out_1 = self.dense3(out_1)
+        out_1 = self.parameterized_layer(out_1)
 
-        return out 
+        out_2 = self.dense2(flattened)
+        out_2 = tf.concat([out_1, out_2], axis=-1)
+        out_2 = self.dense4(out_2)
+        
+        x, y, z = self.prediction_head(out_2)
+        
+        return x, y, z, out_1
+
     
     
 
@@ -210,7 +227,12 @@ if __name__ == '__main__':
     # print(f'Total params: {model3.count_params()}')
 
 
-    model3 = ParameterizedNet(num_ext_conv=0)
+    # model3 = ParameterizedNet(num_ext_conv=0)
+    # model3.build(input_shape=(None, 180, 320, 1))
+    # model3.summary()
+    # print(f'Total params: {model3.count_params()}')
+
+    model3 = BackboneSharedParameterizedNet(num_ext_conv=1)
     model3.build(input_shape=(None, 180, 320, 1))
     model3.summary()
     print(f'Total params: {model3.count_params()}')
