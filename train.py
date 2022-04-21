@@ -6,7 +6,7 @@ from model.model import DepthAwareNet
 from model.loss import L2DepthLoss, L2NormRMSE
 
 from solver.optimizer import OptimizerFactory
-from solver.trainer import Trainer
+
 
 import argparse
 
@@ -16,6 +16,7 @@ parser = argparse.ArgumentParser(description='Select between small or big data',
                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
 parser.add_argument('-d', '--data-size', type=str, choices=['big', 'small', 'real'], default='small')
+parser.add_argument('-m', '--training-mode', type=str, choices=['normal', 'parameterized'], default='parameterized')
 parser.add_argument('-b', '--batch-size', type=int, default=32)
 parser.add_argument('-j', '--jobs', type=int,  default=8)
 
@@ -31,17 +32,17 @@ if args.data_size == 'big':
     # val_path = "../data/val_big.csv"
     # img_directory = "../data/big/"
 
-    train_path = "/home/ivsr/CV_Group/phuc/airsim/train.csv"
-    val_path = "/home/ivsr/CV_Group/phuc/airsim/val.csv"
-    img_directory = "/home/ivsr/CV_Group/phuc/airsim/data"
+    train_path = "/media/data/teamAI/phuc/phuc/airsim/train.csv"
+    val_path = "/media/data/teamAI/phuc/phuc/airsim/val.csv"
+    img_directory = "/media/data/teamAI/phuc/phuc/airsim/data"
 else:
     # train_path = "../data/train_small.csv"
     # val_path = "../data/val_small.csv"
     # img_directory = "../data/small/"
 
-    train_path = "/home/ivsr/CV_Group/minh/train588_50.csv"
-    val_path = "/home/ivsr/CV_Group/minh/val588_50.csv"
-    img_directory = "/home/ivsr/CV_Group/minh/50imperpose/full"
+    train_path = "/media/data/teamAI/phuc/airsim/10/10_train.csv"
+    val_path = "/media/data/teamAI/phuc/airsim/10/10_val.csv"
+    img_directory = "/media/data/teamAI/phuc/airsim/10"
 
 train_dataset = Dataset(train_path, img_directory, input_shape)
 val_dataset = Dataset(val_path, img_directory, input_shape)
@@ -55,7 +56,7 @@ val_loader = DataLoader(val_dataset, input_shape=input_shape, batch_size=args.ba
 ################
 # Define model #
 ################
-net = DepthAwareNet(num_ext_conv=0)
+net = DepthAwareNet(num_ext_conv=1)
 net.build(input_shape=(None, input_shape[0], input_shape[1], 1))
 net.summary()
 #######################
@@ -78,13 +79,19 @@ optimizer = factory.get_optimizer()
 
 if __name__ == '__main__':
 
+    if args.training_mode =='parameterized':
+        from solver.parameterized_trainer import Trainer
+    else:
+        from solver.trainer import Trainer
+    
+    
     #trainer and train
     trainer = Trainer(train_loader, val_loader=val_loader,
                       model=net, distance_loss_fn=dist_loss_fn, depth_loss_fn=depth_loss_fn,
                       optimizer=optimizer,
-                      log_path='../ivsr_logs/log2501_big_baseline_mse.txt', savepath='../ivsr_weights/training_2501_big_baseline_mse',
+                      log_path='/media/data/teamAI/phuc/phuc/airsim/minh/minh_model.txt', savepath='/media/data/teamAI/phuc/phuc/airsim',
                       use_mse=USE_MSE)
 
-    _  = trainer.train(200, False)
+    _  = trainer.train(10, True)
     #trainer.save_model()
 
