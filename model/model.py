@@ -63,11 +63,12 @@ class SimpleNet(tf.keras.Model):
         return out
 
 class BackBone(tf.keras.Model):
-    def __init__(self, activation='relu',input_shape=(224,398,1), num_ext_conv = 0, ksize=3):
+    def __init__(self, activation='relu',input_shape=(224,398,1), num_ext_conv = 0, ksize=3, num_branch=1):
         super().__init__()
         self.activation  = activation
         self.num_ext_conv  = num_ext_conv
         self.ksize = ksize
+        self.num_branch = num_branch
 
         def downsample_convolution(out_channels=32,  name='conv'):
 
@@ -80,19 +81,34 @@ class BackBone(tf.keras.Model):
             downsample_convolution(32, name='conv1'),
             downsample_convolution(64, name='conv2'),
             downsample_convolution(128, name='conv3'),
-            downsample_convolution(256, name='conv4')
+            # downsample_convolution(256, name='conv4')
         ], name='conv_base')
 
         if self.num_ext_conv > 0 :
-            self.conv_ext = Sequential([
-                downsample_convolution(256, name=f'conv{4+i}') for i in range(self.num_ext_conv)
-            ], name='conv_ext')
+            if num_branch <= 1:
+                self.conv_ext = Sequential([
+                    downsample_convolution(256, name=f'conv{4+i}')  for i in range(self.num_ext_conv)
+                ], name='conv_ext')
+            else: 
+                self.conv_ext = []
+                for j in range(self.num_branch):
+                    self.conv_ext.append(
+                        Sequential([ downsample_convolution(256, name=f'conv{4+i}')  for i in range(self.num_ext_conv)
+                        ], name=f'branch{j}')
+                    )
 
     
     def call(self, inputs, training=None, mask=None):
         out = self.conv_base(inputs)
         if self.num_ext_conv > 0:
-            out = self.conv_ext(out)
+            if self.num_branch <= 1:
+                out = self.conv_ext(out)
+            else:
+                final_out = []
+                for branch in self.conv_ext:
+                    final_out.append(branch(out))
+                out = final_out
+
         return out
 
 class ParameterizedNet(tf.keras.Model):
@@ -101,8 +117,7 @@ class ParameterizedNet(tf.keras.Model):
         self.activation  = activation
         self.num_ext_conv  = num_ext_conv
         self.ksize = ksize
-        self.backbone1 = BackBone(activation, input_shape, num_ext_conv, ksize)
-        self.backbone2 = BackBone(activation, input_shape, num_ext_conv, ksize)
+        self.backbone = BackBone(activation, input_shape, num_ext_conv=1, ksize=3, num_branch=2)
         self.flatten1 = tf.keras.layers.Flatten()
         self.flatten2 = tf.keras.layers.Flatten()
         self.dense1 = Dense(128, activation=self.activation, name='dense1')
@@ -113,13 +128,13 @@ class ParameterizedNet(tf.keras.Model):
         self.prediction_head = PredictionHead()
 
     def call(self, inputs, training=None, mask=None):
-        out_1 = self.backbone1(inputs)
+        [out_1, out_2] = self.backbone(inputs)
         out_1 = self.flatten1(out_1)
         out_1 = self.dense1(out_1)
         out_1 = self.dense3(out_1)
         out_1 = self.parameterized_layer(out_1)
 
-        out_2 = self.backbone2(inputs)
+        # out_2 = self.backbone2(inputs)
         out_2 = self.flatten2(out_2)
         out_2 = self.dense2(out_2)
         out_2 = tf.concat([out_1, out_2], axis=-1)
@@ -227,12 +242,12 @@ if __name__ == '__main__':
     # print(f'Total params: {model3.count_params()}')
 
 
-    # model3 = ParameterizedNet(num_ext_conv=0)
-    # model3.build(input_shape=(None, 180, 320, 1))
-    # model3.summary()
-    # print(f'Total params: {model3.count_params()}')
-
-    model3 = BackboneSharedParameterizedNet(num_ext_conv=1)
+    model3 = ParameterizedNet(num_ext_conv=1)
     model3.build(input_shape=(None, 180, 320, 1))
     model3.summary()
     print(f'Total params: {model3.count_params()}')
+
+    # model3 = BackboneSharedParameterizedNet(num_ext_conv=1)
+    # model3.build(input_shape=(None, 180, 320, 1))
+    # model3.summary()
+    # print(f'Total params: {model3.count_params()}')
