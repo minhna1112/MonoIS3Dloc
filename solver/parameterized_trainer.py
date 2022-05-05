@@ -68,7 +68,7 @@ class Trainer:
     @tf.function
     def validate_on_batch(self, images,labels, derived_labels):
         # Perform forward pass
-        out_x, out_y, out_z, out_params = self.modelded(images)
+        out_x, out_y, out_z, out_params = self.model(images)
         # Calculate loss
         if self.depth_loss_fn is not None:
             label_x = tf.reshape(labels[..., 0], out_x.shape)

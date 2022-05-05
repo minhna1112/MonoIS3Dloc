@@ -87,7 +87,7 @@ class BackBone(tf.keras.Model):
         if self.num_ext_conv > 0 :
             if num_branch <= 1:
                 self.conv_ext = Sequential([
-                    downsample_convolution(256, name=f'conv{4+i}')  for i in range(self.num_ext_conv)
+                    downsample_convolution(256, name=f'conv4_{i}')  for i in range(self.num_ext_conv)
                 ], name='conv_ext')
             else: 
                 self.conv_ext = []
@@ -229,7 +229,7 @@ class DepthAwareNet(tf.keras.Model):
         # y = self.tanh(y)
         # z = self.tanh(z)
 
-        x, y, z = prediction_head(out)
+        x, y, z = self.prediction_head(out)
 
         return x,y,z #[(batch_size, 1), (batch_size, 1), (batch_size, 1)]
 
