@@ -23,16 +23,23 @@ class Dataset:
     def __init__(self, train_path: str,
                  img_directory: str, input_shape: tuple):
 
-        self.MAX_VALUE = 30.0
         self.input_shape = input_shape
         self.image_dir = Path(img_directory)
 
         self.train_path = train_path
         self.train_df = pd.read_csv(train_path)
+        
+        self.MAX_X = self.train_df["x"].max()
+        self.MAX_Y = self.train_df["y"].max()
+        self.MAX_Z = self.train_df["z"].max()
+        self.MAX_VALUE = max([self.MAX_X, self.MAX_Y, self.MAX_Z ])
+        print(f"Maximum values of x = {self.MAX_X}, y = {self.MAX_Y}, z = {self.MAX_Z}")
+        
         self.train_df = self.preprocess_label(self.train_df)
         self.white_list_formats  = ('png', 'jpg', 'jpeg', 'bmp', 'ppm', 'tif', 'tiff')
 
-    def preprocess_label(self, train_df: pd.DataFrame):
+
+    def preprocess_label(self, train_df: pd.DataFrame):      
         train_df["x"] = train_df["x"].div(self.MAX_VALUE)
         train_df["y"] = train_df["y"].div(self.MAX_VALUE)
         train_df["z"] = train_df["z"].div(self.MAX_VALUE)
@@ -64,6 +71,7 @@ class Dataset:
         print("Validating filenames ... ... ...")
         mask = filepaths.apply(validate_filename, args=(self.white_list_formats,))
         n_invalid = (~mask).sum()
+        print(filepaths[~mask])
         if n_invalid:
             warnings.warn(
                 'Found {} invalid image filename(s) in x_col="{}". '
@@ -76,7 +84,7 @@ class Dataset:
 
 
 class DataLoader:
-    def __init__(self, dataset: Dataset, input_shape, batch_size: int, shuffle=True, num_parallel_calls = 4):
+    def __init__(self, dataset: Dataset, input_shape, batch_size: int, shuffle=True, num_parallel_calls = 4, validate=False):
         self.dataset = dataset
         self.input_shape = input_shape
         #self.dataset.generate_dataiterator(split)
@@ -85,7 +93,8 @@ class DataLoader:
         self.shuffle = shuffle
         self.num_parallel_calls = num_parallel_calls
 
-        self.dataset._filter_valid_filepaths('img')
+        if validate is True:
+            self.dataset._filter_valid_filepaths('img')
 
     def generator(self):
         indices = range(len(self.dataset))

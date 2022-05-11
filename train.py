@@ -30,11 +30,11 @@ else:
     val_path = "./val588_50_new.csv"
     img_directory = "/media/data/teamAI/phuc/phuc/airsim/50imperpose/full/"
 
-if args.training_mode =='parameterized':
-    from data.parameterized_parallel_dataset import Dataset, DataLoader
-else:
+if args.training_mode =='normal':
     from data.parallel_dataset import Dataset, DataLoader
-
+else:
+    from data.parameterized_parallel_dataset import Dataset, DataLoader
+    
 train_dataset = Dataset(train_path, img_directory, input_shape)
 val_dataset = Dataset(val_path, img_directory, input_shape)
 
@@ -72,17 +72,17 @@ factory = OptimizerFactory(lr=1e-3, use_scheduler=False)
 optimizer = factory.get_optimizer()
 
 #trainer and train
-if args.training_mode =='parameterized':
-    from solver.parameterized_trainer import Trainer
-else:
+if args.training_mode =='normal':
     from solver.trainer import Trainer
-
+else:
+    from solver.parameterized_trainer import Trainer
+    
 trainer = Trainer(train_loader, val_loader=val_loader,
                     model=net, distance_loss_fn=dist_loss_fn, depth_loss_fn=depth_loss_fn,
                     optimizer=optimizer,
-                    log_path='/media/data/teamAI/minh/ivsr-logs/training0305parameterized.txt', savepath='/media/data/teamAI/minh/ivsr_weights/training0305parameterized',
+                    log_path='/media/data/teamAI/minh/ivsr-logs/training0905shared.txt', savepath='/media/data/teamAI/minh/ivsr_weights/training0905shared',
                     use_mse=USE_MSE)
 
-_  = trainer.train(20, save_checkpoint=True, early_stop=True)
+_  = trainer.train(30, save_checkpoint=True, early_stop=True)
 #trainer.save_model()
 

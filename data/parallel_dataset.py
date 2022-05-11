@@ -21,15 +21,16 @@ parser.add_argument('-d', '--data-size', type=str, choices=['big', 'small', 'rea
 
 class Dataset:
     def __init__(self, train_path: str,
-                 img_directory: str, input_shape: tuple):
+                 img_directory: str, input_shape: tuple, preprocess_label=True):
 
-        self.MAX_VALUE = 30.0
+        self.MAX_VALUE = 31.24
         self.input_shape = input_shape
         self.image_dir = Path(img_directory)
 
         self.train_path = train_path
         self.train_df = pd.read_csv(train_path)
-        self.train_df = self.preprocess_label(self.train_df)
+        if preprocess_label:
+            self.train_df = self.preprocess_label(self.train_df)
         self.white_list_formats  = ('png', 'jpg', 'jpeg', 'bmp', 'ppm', 'tif', 'tiff')
 
     def preprocess_label(self, train_df: pd.DataFrame):
@@ -74,7 +75,7 @@ class Dataset:
 
 
 class DataLoader:
-    def __init__(self, dataset: Dataset, input_shape, batch_size: int, shuffle=True, num_parallel_calls = 4):
+    def __init__(self, dataset: Dataset, input_shape, batch_size: int, shuffle=True, num_parallel_calls = 4, validate=False):
         self.dataset = dataset
         self.input_shape = input_shape
         #self.dataset.generate_dataiterator(split)
@@ -82,9 +83,10 @@ class DataLoader:
         self.batch_size = batch_size
         self.shuffle = shuffle
         self.num_parallel_calls = num_parallel_calls
-
-        self.dataset._filter_valid_filepaths('img')
-
+        
+        if validate is True:
+            self.dataset._filter_valid_filepaths('img')
+        
     def generator(self):
         indices = range(len(self.dataset))
         if self.shuffle:
