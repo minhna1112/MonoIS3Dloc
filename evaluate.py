@@ -1,30 +1,42 @@
-import numpy as np
-import faulthandler; faulthandler.enable()
 import tensorflow as tf
-from core import PPNet
-from core import dataset
+import argparse
+from data.parallel_dataset import Dataset, DataLoader
+from solver.evaluator import Evaluator
 
-class RelativeError(tf.keras.metrics.Metric):
-    def __init__(self, name='relative_error', **kwargs):
-        super(RelativeError, self).__init__(name=name, **kwargs)
-        self.error = self.add_weight(name=name, initializer="zeros")
 
-    def update_state(self, y_true, y_pred, sample_weight=None):
-        loss_obj = PPNet.CustomRMSE()
-        self.error.assign(loss_obj(y_true, y_pred))
 
-    def result(self):
-        return self.error
+parser = argparse.ArgumentParser(description='Select between small or big data',
+                                 formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-def eval():
-    data_gen = tf.keras.preprocessing.image.ImageDataGenerator()
-    val_data = dataset.DataLoader('../IVSR_BINARY_DATA/50imperpose/data/', data_gen, split='val')
-    val_generator = val_data.batch_loader()
-    #model = tf.keras.models.load_model('./weights/baseline_2204_simp_zcentered')
-    model = tf.keras.models.load_model('./weights/training_1405_downscaled_mse_subset-1e-4', compile=False)
-    #model.compile(loss='mse', metrics=[UpscaledRelativeError()])
-    model.compile(loss='mse', metrics=[tf.keras.losses.MeanSquaredError(),RelativeError()])
-    model.evaluate(val_generator, batch_size=val_generator.batch_size)
+parser.add_argument('-d', '--data-size', type=str, choices=['big', 'small', 'real'], default='big')
+parser.add_argument('-b', '--batch-size', type=int, default=32)
+parser.add_argument('-j', '--jobs', type=int,  default=16)
 
-if __name__ == '__main__':
-    eval()
+args = parser.parse_args()
+
+################################
+#   Define data and dataloader #
+################################
+if args.data_size == 'big':
+    val_path = "./test_new.csv"
+    img_directory = "/media/data/teamAI/phuc/phuc/airsim/data"
+else:
+    val_path = "./val588_50_new.csv"
+    img_directory = "/media/data/teamAI/phuc/phuc/airsim/50imperpose/full/"
+
+input_shape = (180, 320)
+val_dataset = Dataset(val_path, img_directory, input_shape, preprocess_label=False)
+val_loader = DataLoader(val_dataset, input_shape=input_shape, batch_size=args.batch_size, num_parallel_calls=args.jobs, 
+                    validate=False, shuffle=False)
+
+################
+# Define model #
+################
+net = tf.keras.models.load_model('/media/data/teamAI/minh/ivsr_weights/training0505parameterized/cp-9.cpkt')
+net.build(input_shape=(None, input_shape[0], input_shape[1], 1))
+net.summary()
+################
+# evaluator #
+################
+evaluator = Evaluator(val_loader, model = net, log_path = '/media/data/teamAI/minh/ivsr-logs/evaluate0505parameterized.csv')
+evaluator.evaluate_on_dataframe()

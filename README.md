@@ -1,4 +1,9 @@
-core/common.py: Building blocks of PPNet
-core/PPNet.py: PPNet architecture
+# Segmentation to 3D postion
 
-training.py: Apply keras ImageDataGenerator
+##Train commands:
+
+For big dataset: 
+python3 ./train.py -d 'big' -b 64 -j8
+
+For small dataset: 
+python3 ./train.py -d 'small' -b 64 -j8
