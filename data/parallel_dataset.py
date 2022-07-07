@@ -21,7 +21,15 @@ parser.add_argument('-d', '--data-size', type=str, choices=['big', 'small', 'rea
 
 class Dataset:
     def __init__(self, train_path: str,
-                 img_directory: str, input_shape: tuple, preprocess_label=True):
+                 img_directory: str, input_shape, preprocess_label=True):
+        """
+            Args: 
+                + train_path: path to csv file containing label and img files
+                + img_directory: path to folder containing images
+                + input_shape: shape of images to be processed for the neural nets
+                + preprocess_label: if divide the x, y, z values by the MAX_VALUE
+        """
+
 
         self.MAX_VALUE = 31.24
         self.input_shape = input_shape
@@ -34,15 +42,27 @@ class Dataset:
         self.white_list_formats  = ('png', 'jpg', 'jpeg', 'bmp', 'ppm', 'tif', 'tiff')
 
     def preprocess_label(self, train_df: pd.DataFrame):
+        """
+        Normalize all coordinates in the data frame to [0,1]
+        """
         train_df["x"] = train_df["x"].div(self.MAX_VALUE)
         train_df["y"] = train_df["y"].div(self.MAX_VALUE)
         train_df["z"] = train_df["z"].div(self.MAX_VALUE)
         return train_df
 
     def __len__(self):
+        """
+        Return: total number of samples = total number of imgs files in img_directory = total number of rows in train_df
+        """
         return len(self.train_df)
 
     def __getitem__(self, index):
+        """
+        Args: index of the desired element
+
+        REturn:    X: path to the binary image
+                   y:  3D coordinates of the object in the selected img (in camera frame)
+        """
         X = self.image_dir / self.train_df['img'].iat[index]
         y = self.train_df[['x', 'y', 'z']].iloc[index]
         return X, y
