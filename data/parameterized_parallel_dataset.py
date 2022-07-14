@@ -94,12 +94,8 @@ class DataLoader:
         self.shuffle = shuffle
         self.num_parallel_calls = num_parallel_calls
 
-<<<<<<< HEAD
-        self.dataset._filter_valid_filepaths('img')
-=======
         if validate is True:
             self.dataset._filter_valid_filepaths('img')
->>>>>>> 48de51aec18c1fac917423ef6ca3d2f362550169
 
     def generator(self):
         indices = range(len(self.dataset))
@@ -122,11 +118,7 @@ class DataLoader:
 
     def make_batch(self):
 
-<<<<<<< HEAD
         tf_dataset = tf.data.Dataset.from_generator(self.generator, output_types=(tf.string, tf.float32, tf.int32))
-=======
-        tf_dataset = tf.data.Dataset.from_generator(self.generator, output_types=(tf.string, tf.float32, tf.int64))
->>>>>>> 48de51aec18c1fac917423ef6ca3d2f362550169
         tf_dataset = tf_dataset.map(self.to_tensor, num_parallel_calls=self.num_parallel_calls)
         tf_dataset = tf_dataset.batch(self.batch_size)
 
