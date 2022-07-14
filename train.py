@@ -89,7 +89,7 @@ else:
 trainer = Trainer(train_loader, val_loader=val_loader,
                     model=net, distance_loss_fn=dist_loss_fn, depth_loss_fn=depth_loss_fn,
                     optimizer=optimizer,
-                    log_path='/media/data/teamAI/minh/ivsr-logs/training_kitti1407.txt', savepath='/media/data/teamAI/minh/ivsr_weights/training_kitti1407',
+                    log_path='/media/data/teamAI/minh/ivsr-logs/training_kitti1507.txt', savepath='/media/data/teamAI/minh/ivsr_weights/training_kitti1507',
                     use_mse=USE_MSE)
 
 _  = trainer.train(30, save_checkpoint=True, early_stop=True)
