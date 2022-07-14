@@ -2,9 +2,9 @@ import pandas as pd
 import numpy as np
 from path import Path
 
-train_path = "./train.csv"
-val_path = "./val.csv"
-test_path = "./test.csv"
+train_path = "/media/data/teamAI/phuc/phuc/airsim/train588_50.csv"
+val_path = "/media/data/teamAI/phuc/phuc/airsim/val588_50.csv"
+test_path = "/media/data/teamAI/phuc/phuc/airsim/test588_50.csv"
 
 
 def deriving_label(path):
