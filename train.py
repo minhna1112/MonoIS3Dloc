@@ -1,13 +1,7 @@
 import tensorflow as tf
-
-from data.parallel_dataset import Dataset, DataLoader
-
-from model.model import DepthAwareNet
+from model.model import DepthAwareNet, ParameterizedNet, BackboneSharedParameterizedNet, Kitti3DPredictor
 from model.loss import L2DepthLoss, L2NormRMSE
-
 from solver.optimizer import OptimizerFactory
-
-
 import argparse
 
 tf.keras.backend.clear_session()
@@ -15,49 +9,58 @@ tf.keras.backend.clear_session()
 parser = argparse.ArgumentParser(description='Select between small or big data',
                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-parser.add_argument('-d', '--data-size', type=str, choices=['big', 'small', 'real'], default='small')
-parser.add_argument('-m', '--training-mode', type=str, choices=['normal', 'parameterized'], default='parameterized')
+parser.add_argument('-d', '--data-size', type=str, choices=['big', 'small', 'real', 'kitti'], default='small')
+parser.add_argument('-m', '--training-mode', type=str, choices=['normal', 'parameterized', 'shared', 'kitti'], default='parameterized')
 parser.add_argument('-b', '--batch-size', type=int, default=32)
 parser.add_argument('-j', '--jobs', type=int,  default=8)
 
 args = parser.parse_args()
 
-input_shape = (180, 320)
+# input_shape = (180, 320)
+input_shape = (180, 595)
 
 ################################
 #   Define data and dataloader #
 ################################
 if args.data_size == 'big':
-    # train_path = "../data/train_big.csv"
-    # val_path = "../data/val_big.csv"
-    # img_directory = "../data/big/"
-
-    train_path = "/media/data/teamAI/phuc/phuc/airsim/train.csv"
-    val_path = "/media/data/teamAI/phuc/phuc/airsim/val.csv"
+    train_path = "./train_new.csv"
+    val_path = "./val_new.csv"
     img_directory = "/media/data/teamAI/phuc/phuc/airsim/data"
+elif args.data_size == 'kitti':
+    train_path = "/media/data/teamAI/minh/kitti_out/kitti_train.csv"
+    val_path = "/media/data/teamAI/minh/kitti_out/kitti_val.csv"
+    img_directory = "/media/data/teamAI/minh/kitti_out/semantic-0.4"
 else:
-    # train_path = "../data/train_small.csv"
-    # val_path = "../data/val_small.csv"
-    # img_directory = "../data/small/"
+    train_path = "./train588_50_new.csv"
+    val_path = "./val588_50_new.csv"
+    img_directory = "/media/data/teamAI/phuc/phuc/airsim/50imperpose/full/"
 
-    train_path = "/media/data/teamAI/phuc/airsim/10/10_train.csv"
-    val_path = "/media/data/teamAI/phuc/airsim/10/10_val.csv"
-    img_directory = "/media/data/teamAI/phuc/airsim/10"
-
+if args.training_mode =='normal':
+    from data.parallel_dataset import Dataset, DataLoader
+else:
+    from data.parameterized_parallel_dataset import Dataset, DataLoader
+    
 train_dataset = Dataset(train_path, img_directory, input_shape)
 val_dataset = Dataset(val_path, img_directory, input_shape)
 
 train_loader = DataLoader(train_dataset, input_shape=input_shape, batch_size=args.batch_size, num_parallel_calls=args.jobs)
 val_loader = DataLoader(val_dataset, input_shape=input_shape, batch_size=args.batch_size, num_parallel_calls=args.jobs)
 
-# train_loader = dataset.generate_dataloader('train')
-# val_loader = dataset.generate_dataloader('val')
-
 ################
 # Define model #
 ################
-net = DepthAwareNet(num_ext_conv=1)
+if args.training_mode =='parameterized':
+    net = ParameterizedNet(num_ext_conv=1)
+elif args.training_mode == 'shared':
+    net = BackboneSharedParameterizedNet(num_ext_conv=1)
+elif args.data_size == 'kitti':
+    net = Kitti3DPredictor(num_ext_conv=1)
+else:
+    net = DepthAwareNet(num_ext_conv=0)
+
 net.build(input_shape=(None, input_shape[0], input_shape[1], 1))
+# inputs = tf.keras.Input(shape=(input_shape[0], input_shape[1], 1))
+# _ = net.call(inputs)
 net.summary()
 #######################
 # Define loss function#
@@ -77,21 +80,18 @@ else  :
 factory = OptimizerFactory(lr=1e-3, use_scheduler=False)
 optimizer = factory.get_optimizer()
 
-if __name__ == '__main__':
-
-    if args.training_mode =='parameterized':
-        from solver.parameterized_trainer import Trainer
-    else:
-        from solver.trainer import Trainer
+#trainer and train
+if args.training_mode =='normal':
+    from solver.trainer import Trainer
+else:
+    from solver.parameterized_trainer import Trainer
     
-    
-    #trainer and train
-    trainer = Trainer(train_loader, val_loader=val_loader,
-                      model=net, distance_loss_fn=dist_loss_fn, depth_loss_fn=depth_loss_fn,
-                      optimizer=optimizer,
-                      log_path='/media/data/teamAI/phuc/phuc/airsim/minh/minh_model.txt', savepath='/media/data/teamAI/phuc/phuc/airsim',
-                      use_mse=USE_MSE)
+trainer = Trainer(train_loader, val_loader=val_loader,
+                    model=net, distance_loss_fn=dist_loss_fn, depth_loss_fn=depth_loss_fn,
+                    optimizer=optimizer,
+                    log_path='/media/data/teamAI/minh/ivsr-logs/training_kitti1407.txt', savepath='/media/data/teamAI/minh/ivsr_weights/training_kitti1407',
+                    use_mse=USE_MSE)
 
-    _  = trainer.train(10, True)
-    #trainer.save_model()
+_  = trainer.train(30, save_checkpoint=True, early_stop=True)
+#trainer.save_model()
 

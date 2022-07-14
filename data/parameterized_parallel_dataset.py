@@ -9,7 +9,7 @@ import argparse
 import os
 import warnings
 
-from keras_preprocessing.image import validate_filename
+from keras_preprocessing.image.utils import validate_filename
 
 parser = argparse.ArgumentParser(description='Select between small or big data',
                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -61,8 +61,10 @@ class Dataset:
         filepaths = self.train_df [x_col].map(
             lambda fname: os.path.join(self.image_dir, fname)
         )
+        # print(filepaths.iloc[921])
         print("Validating filenames ... ... ...")
         mask = filepaths.apply(validate_filename, args=(self.white_list_formats,))
+        # print(mask)
         n_invalid = (~mask).sum()
         if n_invalid:
             warnings.warn(
@@ -71,7 +73,6 @@ class Dataset:
                 .format(n_invalid, x_col)
             )
         self.train_df = self.train_df[mask]
-        
         return self.train_df
 
 
@@ -85,7 +86,7 @@ class DataLoader:
         self.shuffle = shuffle
         self.num_parallel_calls = num_parallel_calls
 
-        # self.dataset._filter_valid_filepaths('img')
+        self.dataset._filter_valid_filepaths('img')
 
     def generator(self):
         indices = range(len(self.dataset))
@@ -108,7 +109,7 @@ class DataLoader:
 
     def make_batch(self):
 
-        tf_dataset = tf.data.Dataset.from_generator(self.generator, output_types=(tf.string, tf.float32))
+        tf_dataset = tf.data.Dataset.from_generator(self.generator, output_types=(tf.string, tf.float32, tf.int32))
         tf_dataset = tf_dataset.map(self.to_tensor, num_parallel_calls=self.num_parallel_calls)
         tf_dataset = tf_dataset.batch(self.batch_size)
 
