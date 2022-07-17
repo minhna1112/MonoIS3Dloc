@@ -16,12 +16,13 @@ class Distiller(Trainer):
 
         super(Distiller, self).__init__(dataloader = dataloader, val_loader = val_loader, optimizer = optimizer,
                                 distance_loss_fn = distance_loss_fn, depth_loss_fn = depth_loss_fn,
-                                log_path = log_path, savepath = savepath, use_mse = use_mse)
+                                log_path = log_path, savepath = savepath, use_mse = use_mse,
+                                model=student)
         self.teacher = teacher
-        self.model = student
+        # self.model = student
         self.distillation_loss_fn = distillation_loss_fn
         self.alpha = alpha
-        self.temperature = 3
+        self.temperature = temperature
         self.loss_dict = { 'train_dist_loss': [], 'train_distill_loss': [], 'entropy_loss': [],
                            'val_dist_loss': [], 'val_depth_loss': [], 'val_entropy_loss': []}
         pd.DataFrame(self.loss_dict).to_csv(log_path)
@@ -71,7 +72,7 @@ class Distiller(Trainer):
 
     def train(self, epochs: int, save_checkpoint=True,
               parallel=True, early_stop=True):
-        patience = 3
+        patience = 5
         wait = 0
         best = self.dataloader.dataset.MAX_VALUE
         for e in range(epochs):
