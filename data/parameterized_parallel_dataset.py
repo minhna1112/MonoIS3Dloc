@@ -100,7 +100,7 @@ class DataLoader:
     def generator(self):
         indices = range(len(self.dataset))
         if self.shuffle:
-            indices = random.sample(range(len(self.dataset)), len(indices))
+            indices = random.sample(indices, len(indices))
         for i in indices:
             # yield a tuple of image and corresponding positions labels
             yield self.dataset[i]
@@ -154,26 +154,10 @@ if __name__ == '__main__':
     #print(len(train_loader))
     #
     # begin = time.time()
-    # for batch_id, (images, labels) in enumerate(tqdm(batch_loader, colour='#c22c4e')):
-    #     pass
+    for batch_id, (images, labels, derived_label) in enumerate(tqdm(batch_loader, colour='#c22c4e')):
+        pass
     # print(f'Process: {time.time()-begin} (s)')
     # # train_loader = dataset.generate_dataloader('train')
     # val_loader = dataset.generate_dataloader('val')
 
 
-    # next_batch = next(batch_loader)
-    # print(next_batch[0].shape) # batch_size, h, w, 1
-    # print(next_batch[1].shape) # batch_size, 3
-
-    # next_batch = next(val_loader)
-    # print(next_batch[0].shape) # batch_size, h, w, 1
-    # print(next_batch[1].shape) # batch_size, 3
-
-    # train_loader = DataLoader(dataset, 'val')
-    # tf_dataset = tf.data.Dataset.from_generator(train_loader.generator, output_types=(tf.float32, tf.float32))
-    # tf_dataset = tf_dataset.map(lambda x, y: (tf.squeeze(x, axis=0), tf.squeeze(y, axis=0)), num_parallel_calls=4)
-    # tf_dataset = tf_dataset.batch(320)
-    # for i, (X, y) in enumerate(batch_loader):
-    #     print(X.shape)
-    #     print(y.shape)
-    #print(next(iter(train_loader.generator())))  # batch_size, h, w, 1; batch_size, 3
