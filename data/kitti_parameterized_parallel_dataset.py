@@ -9,7 +9,7 @@ import argparse
 import os
 import warnings
 
-from keras_preprocessing.image.utils import validate_filename
+from keras_preprocessing.image import validate_filename
 
 parser = argparse.ArgumentParser(description='Select between small or big data',
                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -23,23 +23,16 @@ class Dataset:
     def __init__(self, train_path: str,
                  img_directory: str, input_shape: tuple):
 
+        self.MAX_VALUE = 30.0
         self.input_shape = input_shape
         self.image_dir = Path(img_directory)
 
         self.train_path = train_path
         self.train_df = pd.read_csv(train_path)
-        
-        self.MAX_X = self.train_df["x"].max()
-        self.MAX_Y = self.train_df["y"].max()
-        self.MAX_Z = self.train_df["z"].max()
-        self.MAX_VALUE = max([self.MAX_X, self.MAX_Y, self.MAX_Z ])
-        print(f"Maximum values of x = {self.MAX_X}, y = {self.MAX_Y}, z = {self.MAX_Z}")
-        
         self.train_df = self.preprocess_label(self.train_df)
         self.white_list_formats  = ('png', 'jpg', 'jpeg', 'bmp', 'ppm', 'tif', 'tiff')
 
-
-    def preprocess_label(self, train_df: pd.DataFrame):      
+    def preprocess_label(self, train_df: pd.DataFrame):
         train_df["x"] = train_df["x"].div(self.MAX_VALUE)
         train_df["y"] = train_df["y"].div(self.MAX_VALUE)
         train_df["z"] = train_df["z"].div(self.MAX_VALUE)
@@ -68,12 +61,9 @@ class Dataset:
         filepaths = self.train_df [x_col].map(
             lambda fname: os.path.join(self.image_dir, fname)
         )
-        # print(filepaths.iloc[921])
         print("Validating filenames ... ... ...")
         mask = filepaths.apply(validate_filename, args=(self.white_list_formats,))
-        # print(mask)
         n_invalid = (~mask).sum()
-        print(filepaths[~mask])
         if n_invalid:
             warnings.warn(
                 'Found {} invalid image filename(s) in x_col="{}". '
@@ -81,11 +71,12 @@ class Dataset:
                 .format(n_invalid, x_col)
             )
         self.train_df = self.train_df[mask]
+        
         return self.train_df
 
 
 class DataLoader:
-    def __init__(self, dataset: Dataset, input_shape, batch_size: int, shuffle=True, num_parallel_calls = 4, validate=False):
+    def __init__(self, dataset: Dataset, input_shape, batch_size: int, shuffle=True, num_parallel_calls = 4):
         self.dataset = dataset
         self.input_shape = input_shape
         #self.dataset.generate_dataiterator(split)
@@ -94,8 +85,7 @@ class DataLoader:
         self.shuffle = shuffle
         self.num_parallel_calls = num_parallel_calls
 
-        if validate is True:
-            self.dataset._filter_valid_filepaths('img')
+        # self.dataset._filter_valid_filepaths('img')
 
     def generator(self):
         indices = range(len(self.dataset))
@@ -118,7 +108,7 @@ class DataLoader:
 
     def make_batch(self):
 
-        tf_dataset = tf.data.Dataset.from_generator(self.generator, output_types=(tf.string, tf.float32, tf.int32))
+        tf_dataset = tf.data.Dataset.from_generator(self.generator, output_types=(tf.string, tf.float32))
         tf_dataset = tf_dataset.map(self.to_tensor, num_parallel_calls=self.num_parallel_calls)
         tf_dataset = tf_dataset.batch(self.batch_size)
 

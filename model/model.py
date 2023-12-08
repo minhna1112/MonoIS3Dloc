@@ -18,10 +18,18 @@ class PredictionHead(tf.keras.Model):
         z = self.tanh(z)
         return x, y, z
 
+class FrameConverter(tf.keras.Model):
+    def __init__(self):
+        super().__init__()
+    def call(self, x_asim, y_asim, z_asim):
+        x_cam = -y_asim
+        y_cam = -z_asim
+        z_cam = x_asim
+        return x_cam, y_cam, z_cam
+
 class SimpleNet(tf.keras.Model):
     def __init__(self, image_shape, activation='relu',input_shape=(224,398,1)):
         super(SimpleNet, self).__init__()
-
         self.image_shape = image_shape
         self.activation  = activation
 
@@ -62,15 +70,16 @@ class SimpleNet(tf.keras.Model):
         out = self.dense3(out)
         return out
 
+
 class BackBone(tf.keras.Model):
-    def __init__(self, activation='relu',input_shape=(224,398,1), num_ext_conv = 0, ksize=3, num_branch=1):
+    def __init__(self, activation='relu', input_shape=(224, 398, 1), num_ext_conv=0, ksize=3, num_branch=1):
         super().__init__()
-        self.activation  = activation
-        self.num_ext_conv  = num_ext_conv
+        self.activation = activation
+        self.num_ext_conv = num_ext_conv
         self.ksize = ksize
         self.num_branch = num_branch
 
-        def downsample_convolution(out_channels=32,  name='conv'):
+        def downsample_convolution(out_channels=32, name='conv'):
 
             conv = Conv2D(out_channels, (self.ksize, self.ksize), activation=self.activation, padding='same')
             pool = MaxPooling2D(pool_size=(2, 2))
@@ -84,20 +93,19 @@ class BackBone(tf.keras.Model):
             # downsample_convolution(256, name='conv4')
         ], name='conv_base')
 
-        if self.num_ext_conv > 0 :
+        if self.num_ext_conv > 0:
             if num_branch <= 1:
                 self.conv_ext = Sequential([
-                    downsample_convolution(256, name=f'conv4_{i}')  for i in range(self.num_ext_conv)
+                    downsample_convolution(256, name=f'conv4_{i}') for i in range(self.num_ext_conv)
                 ], name='conv_ext')
-            else: 
+            else:
                 self.conv_ext = []
                 for j in range(self.num_branch):
                     self.conv_ext.append(
-                        Sequential([ downsample_convolution(256, name=f'conv{4+i}')  for i in range(self.num_ext_conv)
-                        ], name=f'branch{j}')
+                        Sequential([downsample_convolution(256, name=f'conv{4 + i}') for i in range(self.num_ext_conv)
+                                    ], name=f'branch{j}')
                     )
 
-    
     def call(self, inputs, training=None, mask=None):
         out = self.conv_base(inputs)
         if self.num_ext_conv > 0:
@@ -145,24 +153,22 @@ class ParameterizedNet(tf.keras.Model):
         return x, y, z, out_1
 
 class BackboneSharedParameterizedNet(tf.keras.Model):
-    def __init__(self, activation='relu',input_shape=(224,398,1), num_ext_conv = 0, ksize=3, num_params = 3):
+    def __init__(self, activation='relu', input_shape=(224, 398, 1), num_ext_conv=0, ksize=3, num_params=3):
         super().__init__()
-        self.activation  = activation
-        self.num_ext_conv  = num_ext_conv
+        self.activation = activation
+        self.num_ext_conv = num_ext_conv
         self.ksize = ksize
         self.backbone1 = BackBone(activation, input_shape, num_ext_conv, ksize)
         self.flatten1 = tf.keras.layers.Flatten()
 
         self.dense1 = Dense(128, activation=self.activation, name='dense1')
         self.dense2 = Dense(128, activation=self.activation, name='dense2')
-        self.dense3 = Dense(3,  name='dense3')
-        self.dense4 = Dense(3,  name='dense4')
+        self.dense3 = Dense(3, name='dense3')
+        self.dense4 = Dense(3, name='dense4')
         self.parameterized_layer = tf.keras.layers.Activation('softmax')
         self.prediction_head = PredictionHead()
-        
 
     def call(self, inputs, training=None, mask=None):
-
         out_1 = self.backbone1(inputs)
         flattened = self.flatten1(out_1)
 
@@ -173,13 +179,19 @@ class BackboneSharedParameterizedNet(tf.keras.Model):
         out_2 = self.dense2(flattened)
         out_2 = tf.concat([out_1, out_2], axis=-1)
         out_2 = self.dense4(out_2)
-        
-        x, y, z = self.prediction_head(out_2)
-        
-        return x, y, z, out_1
 
+        x, y, z = self.prediction_head(out_2)
+
+        return x, y, z, out_1
     
-    
+class Kitti3DPredictor(BackboneSharedParameterizedNet):
+    def __init__(self,  activation='relu', input_shape=(224, 398, 1), num_ext_conv=0, ksize=3, num_params=3):
+        super().__init__(activation, input_shape, num_ext_conv, ksize, num_params)
+        self.frame_converter = FrameConverter()
+    def call(self, inputs, training=None, mask=None):
+        x_asim, y_asim, z_asim, out_1 = super().call(inputs)
+        x_cam, y_cam, z_cam = self.frame_converter(x_asim, y_asim, z_asim)
+        return x_cam, y_cam, z_cam, out_1
 
 class DepthAwareNet(tf.keras.Model):
     def __init__(self, activation='relu',input_shape=(224,398,1), num_ext_conv = 0, ksize=3):

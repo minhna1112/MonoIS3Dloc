@@ -1,8 +1,10 @@
 import tensorflow as tf
-from model.model import DepthAwareNet, ParameterizedNet, BackboneSharedParameterizedNet, Kitti3DPredictor
+from model.model import Kitti3DPredictor, BackboneSharedParameterizedNet
 from model.loss import L2DepthLoss, L2NormRMSE
 from solver.optimizer import OptimizerFactory
 import argparse
+from data.parameterized_parallel_dataset import Dataset, DataLoader
+
 
 tf.keras.backend.clear_session()
 
@@ -35,10 +37,6 @@ else:
     val_path = "./val588_50_new.csv"
     img_directory = "/media/data/teamAI/phuc/phuc/airsim/50imperpose/full/"
 
-if args.training_mode =='normal':
-    from data.parallel_dataset import Dataset, DataLoader
-else:
-    from data.parameterized_parallel_dataset import Dataset, DataLoader
     
 train_dataset = Dataset(train_path, img_directory, input_shape)
 val_dataset = Dataset(val_path, img_directory, input_shape)
@@ -49,19 +47,22 @@ val_loader = DataLoader(val_dataset, input_shape=input_shape, batch_size=args.ba
 ################
 # Define model #
 ################
-if args.training_mode =='parameterized':
-    net = ParameterizedNet(num_ext_conv=1)
-elif args.training_mode == 'shared':
-    net = BackboneSharedParameterizedNet(num_ext_conv=1)
-elif args.data_size == 'kitti':
-    net = Kitti3DPredictor(num_ext_conv=1)
-else:
-    net = DepthAwareNet(num_ext_conv=0)
 
-net.build(input_shape=(None, input_shape[0], input_shape[1], 1))
+
+teacher = tf.keras.models.load_model('/media/data/teamAI/minh/ivsr_weights/training_kitti1507/cp-25.cpkt')
+teacher.build(input_shape=(None, input_shape[0], input_shape[1], 1))
+# teacher.name = 'teacher'
+teacher.summary()
+
+if args.training_mode =='shared':
+    student = BackboneSharedParameterizedNet(num_ext_conv=1)
+elif args.data_size == 'kitti':
+    student = Kitti3DPredictor(num_ext_conv=3)
+
+student.build(input_shape=(None, input_shape[0], input_shape[1], 1))
 # inputs = tf.keras.Input(shape=(input_shape[0], input_shape[1], 1))
 # _ = net.call(inputs)
-net.summary()
+student.summary()
 #######################
 # Define loss function#
 #######################
@@ -73,6 +74,7 @@ else  :
     dist_loss_fn = L2NormRMSE()
     depth_loss_fn = L2DepthLoss()
 
+distill_loss_fn = tf.keras.losses.KLDivergence()
 
 #######################
 # Define optimizer#
@@ -81,16 +83,17 @@ factory = OptimizerFactory(lr=1e-3, use_scheduler=False)
 optimizer = factory.get_optimizer()
 
 #trainer and train
-if args.training_mode =='normal':
-    from solver.trainer import Trainer
-else:
-    from solver.parameterized_trainer import Trainer
-    
-trainer = Trainer(train_loader, val_loader=val_loader,
-                    model=net, distance_loss_fn=dist_loss_fn, depth_loss_fn=depth_loss_fn,
+
+from solver.distiller import Distiller
+
+trainer = Distiller(train_loader, val_loader=val_loader,
+                    teacher = teacher, student=student, 
+                    distance_loss_fn=dist_loss_fn, depth_loss_fn=depth_loss_fn, distillation_loss_fn = distill_loss_fn,
                     optimizer=optimizer,
-                    log_path='/media/data/teamAI/minh/ivsr-logs/training_kitti1507.txt', savepath='/media/data/teamAI/minh/ivsr_weights/training_kitti1507',
-                    use_mse=USE_MSE)
+                    log_path='/media/data/teamAI/minh/ivsr-logs/training_kitti1707_distill.txt', savepath='/media/data/teamAI/minh/ivsr_weights/training_kitti1707_distill',
+                    use_mse=USE_MSE,
+                    alpha = 0.1,
+                    temperature= 10)
 
 _  = trainer.train(30, save_checkpoint=True, early_stop=True)
 #trainer.save_model()
